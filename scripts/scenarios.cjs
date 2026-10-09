@@ -646,3 +646,39 @@ module.exports.pro = async (app, win, out) => {
   // leave the first-run tours for the real user
   await win.evaluate(() => ['home', 'editor'].forEach((n) => localStorage.removeItem(`ilf.tour.${n}.v1`)))
 }
+// Per-tab editor guides: each tab shows its guide the first time it opens; ? replays it.
+module.exports.panels = async (app, win, out) => {
+  const tabs = ['clips', 'frame', 'cursor', 'zoom', 'camera', 'audio', 'background']
+  await win.evaluate((tabs) => { localStorage.setItem('ilf.tour.editor.v1', 'done'); localStorage.setItem('ilf.tour.home.v1', 'done'); tabs.forEach((t) => localStorage.removeItem(`ilf.tour.tab-${t}.v1`)) }, tabs)
+  const list = await win.evaluate(() => window.ilf.projects.list())
+  await win.evaluate((id) => { location.hash = '/editor/' + encodeURIComponent(id) }, list[0].id)
+  await win.waitForTimeout(4000)
+  const labels = { clips: 'Clips', background: 'Background', frame: 'Frame', cursor: 'Cursor', zoom: 'Zoom', camera: 'Camera', audio: 'Audio' }
+  for (const t of tabs) {
+    // the tab buttons are icon-only; their tooltips carry the names, so click by order
+    await win.locator(`[data-tab=${t}]`).click()
+    await win.waitForTimeout(1100)
+    const seen = []
+    for (let k = 0; k < 5; k++) {
+      const card = win.locator('[role=dialog]')
+      if (!(await card.count())) break
+      seen.push(await card.getAttribute('aria-label'))
+      if (k === 0 && (t === 'cursor' || t === 'audio')) await win.screenshot({ path: path.join(out, `panel-${t}.png`) })
+      await win.getByRole('button', { name: /^(Next|Done)$/ }).click()
+      await win.waitForTimeout(650)
+    }
+    console.log('TAB', labels[t], '->', JSON.stringify(seen))
+  }
+  // reopening a tab doesn't repeat it, the ? button does
+  await win.locator('[data-tab=cursor]').click()
+  await win.waitForTimeout(1000)
+  console.log('reopen cursor shows tour:', await win.locator('[role=dialog]').count())
+  await win.locator('button:has(svg.lucide-circle-help)').last().click()
+  await win.waitForTimeout(900)
+  console.log('? replays:', await win.locator('[role=dialog]').getAttribute('aria-label').catch(() => null))
+  await win.getByRole('button', { name: 'Skip' }).click()
+  await win.waitForTimeout(500)
+  console.log('after skip:', await win.locator('[role=dialog]').count())
+  // hand the first-run guides back to the real user
+  await win.evaluate((tabs) => { ['editor', 'home', ...tabs.map((t) => 'tab-' + t)].forEach((n) => localStorage.removeItem(`ilf.tour.${n}.v1`)) }, tabs)
+}

@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import { AnimatePresence, motion } from 'framer-motion'
 import {
-  Camera, Check, Clapperboard, Crosshair, FilePlus2, Scissors, EyeOff, ImagePlus, X, Upload, Music, GripVertical, Play, Square, Plus, LayoutTemplate, MousePointer2, MousePointerClick, Palette, RotateCcw, Sparkles, Trash2, Volume2, ZoomIn
+  Camera, Check, CircleHelp, Clapperboard, Crosshair, FilePlus2, Scissors, EyeOff, ImagePlus, X, Upload, Music, GripVertical, Play, Square, Plus, LayoutTemplate, MousePointer2, MousePointerClick, Palette, RotateCcw, Sparkles, Trash2, Volume2, ZoomIn
 } from 'lucide-react'
 import { useEditor, updateEdit, patchSegment, removeSegment, addSegmentAt, addHideAt, removeHide, cursorPosAt, addClipAt, patchClip, removeClip, splitAtPlayhead, deleteSeqClip, appendSources, setTransition, setAllTransitions } from './store'
 import { player } from './Preview'
@@ -19,6 +19,7 @@ import { cn, fmtTime } from '@/lib/utils'
 import { mediaUrl, defaultEdit, uid } from '@/engine/types'
 import { MAIN, clipAt, seqEvents, sourceInfo, trackOf, type SourceInfo } from '@/engine/sequence'
 import { TransitionIcon, TransitionPicker } from './Transitions'
+import { offerTour, replayTour } from '@/components/Tour'
 import { useSourceThumbs } from './Timeline'
 
 type Tab = 'clips' | 'background' | 'frame' | 'cursor' | 'zoom' | 'camera' | 'audio'
@@ -36,9 +37,9 @@ const TABS: { id: Tab; icon: any; label: string }[] = [
 const set = (fn: (e: EditState) => EditState, history = true) => updateEdit(fn, history)
 const live = (fn: (e: EditState) => EditState) => updateEdit(fn, false)
 
-export function Section({ title, children, action }: { title: string; children: React.ReactNode; action?: React.ReactNode }) {
+export function Section({ title, children, action, tour }: { title: string; children: React.ReactNode; action?: React.ReactNode; tour?: string }) {
   return (
-    <div className="border-b border-white/[0.05] px-5 py-5 last:border-0">
+    <div data-tour={tour} className="border-b border-white/[0.05] px-5 py-5 last:border-0">
       <div className="mb-4 flex items-center justify-between">
         <h3 className="text-[11px] font-semibold uppercase tracking-[0.08em] text-zinc-500">{title}</h3>
         {action}
@@ -156,7 +157,7 @@ export function BackgroundPicker({ bg, onChange, onCommit }: { bg: EditState['ba
       {groups.filter((g) => g !== 'Library').map((g) => (
         <LibrarySection key={g} title={g} items={list.filter((w) => w.group === g)} bg={bg} onPick={pick} />
       ))}
-      <Section title="Studio">
+      <Section title="Studio" tour="bg-studio">
         <div className="grid grid-cols-3 gap-2">
           {STUDIO.map((w) => (
             <Swatch key={w.id} title={w.name} active={bg.kind === 'wallpaper' && bg.value === w.id} onClick={() => choose('wallpaper', w.id)}>
@@ -196,6 +197,7 @@ export function BackgroundPicker({ bg, onChange, onCommit }: { bg: EditState['ba
           <input type="color" value={bg.kind === 'solid' ? bg.value : '#ff4d8d'} onChange={(e) => onChange({ ...bg, kind: 'solid', value: e.target.value }, false)} onBlur={() => onCommit?.()} className="h-7 w-12 cursor-pointer rounded border-0 bg-transparent" />
         </label>
       </Section>
+      <div data-tour="bg-library">
       <LibrarySection
         title="Your library"
         items={list.filter((w) => w.group === 'Library')}
@@ -220,8 +222,9 @@ export function BackgroundPicker({ bg, onChange, onCommit }: { bg: EditState['ba
           </button>
         </div>
       )}
+      </div>
       {bg.kind === 'image' && (
-        <Section title="Photo">
+        <Section title="Photo" tour="bg-photo">
           <LabeledSlider label="Blur" value={bg.blur} min={0} max={6} step={0.1} onChange={(v) => onChange({ ...bg, blur: v }, false)} format={(v) => v.toFixed(1)} />
         </Section>
       )}
@@ -232,7 +235,7 @@ export function BackgroundPicker({ bg, onChange, onCommit }: { bg: EditState['ba
 function FramePanel({ edit }: { edit: EditState }) {
   return (
     <>
-      <Section title="Aspect ratio">
+      <Section title="Aspect ratio" tour="frame-aspect">
         <div className="grid grid-cols-3 gap-2">
           {(['16:9', '9:16', '1:1', '4:3', '4:5', 'auto'] as Aspect[]).map((a) => {
             const [w, h] = a === 'auto' ? [16, 10] : a.split(':').map(Number)
@@ -250,7 +253,7 @@ function FramePanel({ edit }: { edit: EditState }) {
           })}
         </div>
       </Section>
-      <Section title="Style">
+      <Section title="Style" tour="frame-style">
         <LabeledSlider label="Padding" value={edit.padding} min={0} max={0.22} step={0.005} onChange={(v) => live((e) => ({ ...e, padding: v }))} format={(v) => Math.round((v / 0.22) * 100) + '%'} />
         <LabeledSlider label="Corner radius" value={edit.radius} min={0} max={48} step={1} onChange={(v) => live((e) => ({ ...e, radius: v }))} format={(v) => v + 'px'} />
         <LabeledSlider label="Shadow" value={edit.shadow} min={0} max={1} step={0.01} onChange={(v) => live((e) => ({ ...e, shadow: v }))} format={(v) => Math.round(v * 100) + '%'} />
@@ -266,7 +269,7 @@ function CursorPanel({ edit }: { edit: EditState }) {
   const setC = (patch: Partial<EditState['cursor']>, history = true) => updateEdit((e) => ({ ...e, cursor: { ...e.cursor, ...patch } }), history)
   return (
     <>
-      <Section title="Cursor">
+      <Section title="Cursor" tour="cursor-main">
         <SwitchRow label="Cinematic cursor" hint={project.cursorBaked ? 'This take was captured with the system cursor baked in. Enabling adds a second, smoothed cursor on top.' : 'Smoothed, high-res cursor drawn over your recording'} checked={c.enabled} onChange={(v) => setC({ enabled: v })} />
         <div className={cn('space-y-4', !c.enabled && 'pointer-events-none opacity-40')}>
           <div className="grid grid-cols-4 gap-2">
@@ -321,7 +324,7 @@ function CursorPanel({ edit }: { edit: EditState }) {
           <SwitchRow label="Hide while typing" hint="Fades out as you type, comes back when you move the mouse" checked={c.hideTyping} onChange={(v) => setC({ hideTyping: v })} />
         </div>
       </Section>
-      <Section title="Clicks">
+      <Section title="Clicks" tour="cursor-clicks">
         <div className={cn('space-y-4', !c.enabled && 'pointer-events-none opacity-40')}>
           <Segmented layoutId="ce" size="sm" value={c.clickEffect} onChange={(v) => setC({ clickEffect: v })} options={[{ value: 'ripple', label: 'Ripple' }, { value: 'pulse', label: 'Highlight' }, { value: 'none', label: 'None' }]} />
           <div className="text-[11px] text-zinc-500">{seqEvents(project, edit.clips).clicks.length} clicks in this video. Click sounds live in the Audio tab.</div>
@@ -336,7 +339,7 @@ function HiddenRanges({ edit }: { edit: EditState }) {
   const selected = useEditor((s) => s.selected)
   const ranges = edit.cursor.hidden
   return (
-    <Section title={`Hide cursor · ${ranges.length}`}>
+    <Section title={`Hide cursor · ${ranges.length}`} tour="cursor-hide">
       <p className="-mt-1 text-[11.5px] leading-relaxed text-zinc-500">Hide the cursor during messy moments. It fades out and back in smoothly. Tip: double-click the Cursor lane or press H.</p>
       <Button variant="outline" size="sm" className="w-full" onClick={() => addHideAt(useEditor.getState().time)}>
         <EyeOff className="h-3.5 w-3.5" /> Hide cursor at playhead
@@ -405,7 +408,7 @@ function ZoomPanel({ edit }: { edit: EditState }) {
           <Button variant="outline" size="sm" className="w-full" onClick={() => { player.seek(seg.start); player.play() }}>Preview this zoom</Button>
         </Section>
       ) : (
-        <Section title="Zoom">
+        <Section title="Zoom" tour="zoom-main">
           <div className="rounded-xl border border-white/[0.06] bg-gradient-to-br from-brand-pink/[0.07] to-brand-violet/[0.06] p-4">
             <div className="flex items-center gap-2 text-[12.5px] font-medium text-zinc-200"><Sparkles className="h-4 w-4 text-brand-lilac" /> Auto zoom</div>
             <p className="mt-1.5 text-[11.5px] leading-relaxed text-zinc-400">Generates smooth zoom-ins around your clicks and typing, following the cursor.</p>
@@ -431,14 +434,14 @@ function ZoomPanel({ edit }: { edit: EditState }) {
           )}
         </Section>
       )}
-      <Section title="Motion">
+      <Section title="Motion" tour="zoom-motion">
         <div className="space-y-2">
           <div className="text-[12px] text-zinc-400">Transition speed</div>
           <Segmented layoutId="zs" size="sm" value={edit.zoom.speed} onChange={(v) => set((e) => ({ ...e, zoom: { ...e.zoom, speed: v } }))} options={[{ value: 'slow', label: 'Slow' }, { value: 'normal', label: 'Smooth' }, { value: 'fast', label: 'Snappy' }]} />
         </div>
         <LabeledSlider label="Camera follow smoothness" value={edit.zoom.followSmoothness} min={0} max={1} step={0.01} onChange={(v) => updateEdit((e) => ({ ...e, zoom: { ...e.zoom, followSmoothness: v } }), false)} format={(v) => Math.round(v * 100) + '%'} />
       </Section>
-      <Section title={`Segments · ${edit.zoom.segments.length}`}>
+      <Section title={`Segments · ${edit.zoom.segments.length}`} tour="zoom-list">
         <div className="space-y-1.5">
           {edit.zoom.segments.length === 0 && <div className="text-[11.5px] text-zinc-500">No zooms yet.</div>}
           {edit.zoom.segments.map((s, i) => (
@@ -489,7 +492,7 @@ function CameraPanel({ edit }: { edit: EditState }) {
   const anyCam = !!project.camera || (project.sources ?? []).some((x) => x.camera && edit.clips.some((c) => c.source === x.id))
   if (!anyCam)
     return (
-      <Section title="Camera">
+      <Section title="Camera" tour="camera-main">
         <div className="rounded-xl border border-white/[0.06] bg-white/[0.02] p-4 text-[12px] leading-relaxed text-zinc-400">
           This take has no camera footage. Turn on <span className="text-zinc-200">Camera</span> before recording to add a selfie bubble.
         </div>
@@ -497,7 +500,7 @@ function CameraPanel({ edit }: { edit: EditState }) {
     )
   return (
     <>
-      <Section title="Camera">
+      <Section title="Camera" tour="camera-main">
         <SwitchRow label="Show camera" checked={c.enabled} onChange={(v) => setC({ enabled: v })} />
         <div className={cn('space-y-4', !c.enabled && 'pointer-events-none opacity-40')}>
           <Segmented layoutId="cs" size="sm" value={c.shape} onChange={(v) => setC({ shape: v })} options={[{ value: 'circle', label: 'Circle' }, { value: 'rounded', label: 'Rounded' }, { value: 'portrait', label: 'Portrait' }]} />
@@ -527,7 +530,7 @@ function SfxPicker({ edit, k, title, hint, options, preview }: { edit: EditState
   const cfg = edit.sfx[k]
   const setS = (patch: Partial<EditState['sfx'][SfxKey]>, history = true) => updateEdit((e) => ({ ...e, sfx: { ...e.sfx, [k]: { ...e.sfx[k], ...patch } } }), history)
   return (
-    <Section title={title}>
+    <Section title={title} tour={'audio-' + k}>
       <SwitchRow label={`Play ${title.toLowerCase()}`} hint={hint} checked={cfg.enabled} onChange={(v) => setS({ enabled: v })} />
       <div className={cn('space-y-4 transition-opacity', !cfg.enabled && 'pointer-events-none opacity-40')}>
         <div className="grid grid-cols-3 gap-2">
@@ -594,6 +597,7 @@ function YourSounds() {
   }
   return (
     <Section
+      tour="audio-library"
       title="Your sounds"
       action={
         <Button variant="ghost" size="sm" onClick={() => importFrom()}>
@@ -687,7 +691,7 @@ function AudioPanel({ edit }: { edit: EditState }) {
           <LabeledSlider label="Volume" value={clip.volume} min={0} max={2} step={0.01} onChange={(v) => patchClip(clip.id, { volume: v }, false)} format={(v) => Math.round(v * 100) + '%'} />
         </Section>
       )}
-      <Section title="Voice">
+      <Section title="Voice" tour="audio-voice">
         {project.mic ? (
           <>
             <SwitchRow label="Mute microphone" checked={edit.audio.muted} onChange={(v) => set((e) => ({ ...e, audio: { ...e.audio, muted: v } }))} />
@@ -792,6 +796,7 @@ function ClipsPanel({ edit }: { edit: EditState }) {
         </Section>
       )}
       <Section
+        tour="clips-media"
         title={'Project media · ' + all.length}
         action={
           <Button variant="ghost" size="sm" onClick={() => window.ilf.media.import(project.id).then(appendSources)}>
@@ -862,7 +867,7 @@ function TransitionsSection({ edit }: { edit: EditState }) {
     else updateEdit((e) => ({ ...e, clips: e.clips.map((c, i) => (i === 0 ? c : { ...c, tIn: t ?? undefined })) }), false)
   }
   return (
-    <Section title={target ? `Transition into clip ${idx + 1}` : 'Transitions · every cut'}>
+    <Section title={target ? `Transition into clip ${idx + 1}` : 'Transitions · every cut'} tour="clips-transitions">
       <TransitionPicker value={value} onChange={change} onApplyAll={target ? () => setAllTransitions(target.tIn ?? null) : undefined} />
       <div className="flex items-start gap-2 text-[11px] leading-relaxed text-zinc-500">
         <TransitionIcon className="mt-0.5 h-3 w-3 shrink-0 text-brand-orchid" />
@@ -903,7 +908,7 @@ function RecordingsSection() {
     }
   }
   return (
-    <Section title={'Your recordings · ' + list.length}>
+    <Section title={'Your recordings · ' + list.length} tour="clips-recordings">
       <div className="space-y-1.5">
         {shown.map((r) => (
           <div key={r.id} className="group/rec flex items-center gap-3 rounded-xl p-1.5 transition-colors hover:bg-white/[0.04]">
@@ -970,7 +975,12 @@ export function Inspector() {
         {TABS.map((t) => (
           <Tip key={t.id} content={t.label} side="left">
             <button
-              onClick={() => setTab(t.id)}
+              data-tab={t.id}
+              aria-label={t.label}
+              onClick={() => {
+                setTab(t.id)
+                offerTour(`tab-${t.id}`)
+              }}
               className={cn('relative grid h-10 w-10 place-items-center rounded-xl transition-colors', tab === t.id ? 'text-white' : 'text-zinc-500 hover:bg-white/[0.04] hover:text-zinc-300')}
             >
               {tab === t.id && <motion.span layoutId="tab-bg" className="absolute inset-0 rounded-xl bg-white/[0.08] ring-1 ring-white/[0.08]" transition={{ type: 'spring', stiffness: 500, damping: 38 }} />}
@@ -981,7 +991,14 @@ export function Inspector() {
       </div>
       <div className="min-w-0 flex-1 overflow-y-auto">
         <div className="sticky top-0 z-10 flex items-center justify-between border-b border-white/[0.05] bg-[#0e0e13]/90 px-5 py-3 backdrop-blur">
-          <div className="text-[13px] font-semibold text-zinc-100">{TABS.find((t) => t.id === active)!.label}</div>
+          <div className="flex items-center gap-1.5">
+            <div className="text-[13px] font-semibold text-zinc-100">{TABS.find((t) => t.id === active)!.label}</div>
+            <Tip content="Quick guide to this panel" side="bottom">
+              <button onClick={() => replayTour(`tab-${active}`)} className="grid h-6 w-6 place-items-center rounded-md text-zinc-600 transition-colors hover:bg-white/[0.06] hover:text-zinc-200">
+                <CircleHelp className="h-3.5 w-3.5" />
+              </button>
+            </Tip>
+          </div>
           {RESETS[active] && (
             <Tip content="Reset this tab to default settings" side="left">
               <button

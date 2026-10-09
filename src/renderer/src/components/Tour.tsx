@@ -10,7 +10,8 @@ import { LogoMark } from './Brand'
  * data-tour="…"; steps whose element isn't on screen are skipped, so the tour
  * never points at nothing. Esc skips, the arrow keys move between cards.
  */
-export type TourName = 'home' | 'editor'
+export type PanelTour = 'tab-clips' | 'tab-background' | 'tab-frame' | 'tab-cursor' | 'tab-zoom' | 'tab-camera' | 'tab-audio'
+export type TourName = 'home' | 'editor' | PanelTour
 interface Step {
   target?: string
   title: string
@@ -30,8 +31,40 @@ export const TOURS: Record<TourName, Step[]> = {
   editor: [
     { target: 'preview', title: 'Already polished', body: <>This is your finished video. <kbd className="tour-kbd">Space</kbd> plays it, and the export looks exactly like this.</> },
     { target: 'timeline', title: 'The timeline', body: <>Drag zooms to move them, double-click a lane to add one, and press <kbd className="tour-kbd">S</kbd> to split a clip.</> },
-    { target: 'inspector', title: 'Make it yours', body: 'Background, frame, cursor, zoom, camera, sounds and clips each have a tab.' },
+    { target: 'inspector', title: 'Make it yours', body: 'Background, frame, cursor, zoom, camera, sounds and clips each have a tab. Tap the ? at the top of any tab for a quick guide.' },
     { target: 'export', title: 'Share it', body: 'Export an MP4 up to 4K at 60fps, or a GIF for docs.' }
+  ],
+  // one short guide per editor tab, shown the first time each tab is opened
+  'tab-clips': [
+    { target: 'clips-media', title: 'Your clips', body: 'Everything in this project. Import more videos, or press + to add one to the end of the timeline.' },
+    { target: 'clips-recordings', title: 'Earlier recordings', body: 'Bring in a past take with one click. Its clicks, typing and cursor come along, so smart zoom works on it too.' },
+    { target: 'clips-transitions', title: 'Transitions', body: 'Pick how one clip flows into the next, or click the round button on any cut in the timeline.' }
+  ],
+  'tab-background': [
+    { target: 'bg-studio', title: 'Pick a backdrop', body: 'Wallpapers, studio backgrounds and gradients. Click one and the preview updates instantly.' },
+    { target: 'bg-library', title: 'Use your own', body: 'Add any photo as a background. Pick it and a blur slider appears to soften it.' }
+  ],
+  'tab-frame': [
+    { target: 'frame-aspect', title: 'Fit the platform', body: '16:9 for YouTube, 9:16 for Reels and Shorts, 1:1 or 4:5 for feeds.' },
+    { target: 'frame-style', title: 'Give it depth', body: 'Padding, rounded corners and a soft shadow make your screen feel like a product shot.' }
+  ],
+  'tab-cursor': [
+    { target: 'cursor-main', title: 'Cinematic cursor', body: 'Dynamic switches between arrow and hand like macOS. Size and smoothing set the feel.' },
+    { target: 'cursor-clicks', title: 'Click effects', body: 'A ripple or highlight on every click so viewers never miss one.' },
+    { target: 'cursor-hide', title: 'Hide it anywhere', body: 'Add a hide range for moments the cursor would distract.' }
+  ],
+  'tab-zoom': [
+    { target: 'zoom-main', title: 'Smart zoom', body: 'Zooms are placed on your clicks and typing. Regenerate them any time after edits.' },
+    { target: 'zoom-motion', title: 'How it moves', body: 'Choose slow, normal or snappy ease, and how closely the camera follows the cursor.' },
+    { target: 'zoom-list', title: 'Every zoom', body: 'Click one to jump to it. Each can follow the cursor or lock on a fixed point.' }
+  ],
+  'tab-camera': [
+    { target: 'camera-main', title: 'Your webcam bubble', body: 'Pick a shape, corner and size. It shrinks politely while the screen zooms in.' }
+  ],
+  'tab-audio': [
+    { target: 'audio-voice', title: 'Your voice', body: 'Mic volume, or mute it. Recorded with noise suppression.' },
+    { target: 'audio-click', title: 'Sound design', body: 'Click, typing and zoom sounds bring a silent demo to life. Tap a sound to preview it.' },
+    { target: 'audio-library', title: 'Your own audio', body: 'Upload music or voice-overs, then drag them onto the Audio lane of the timeline.' }
   ]
 }
 
@@ -54,9 +87,17 @@ const useTourStore = create<{ name: TourName | null; run: number }>(() => ({ nam
 /** Start a tour now (from the help menu); the other tour shows again next time too. */
 export function replayTour(name: TourName) {
   try {
-    localStorage.removeItem(KEY(name === 'home' ? 'editor' : 'home'))
+    if (name === 'home' || name === 'editor') localStorage.removeItem(KEY(name === 'home' ? 'editor' : 'home'))
   } catch {}
   useTourStore.setState((s) => ({ name, run: s.run + 1 }))
+}
+
+/** Offer a tour once (e.g. the first time a tab opens), unless another one is showing. */
+export function offerTour(name: TourName, delay = 450) {
+  if (seen(name)) return
+  setTimeout(() => {
+    if (!seen(name) && !useTourStore.getState().name) useTourStore.setState((s) => ({ name, run: s.run + 1 }))
+  }, delay)
 }
 
 /** Show a tour once, the first time this screen is ready. */
