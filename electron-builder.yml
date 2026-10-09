@@ -1,0 +1,63 @@
+appId: com.iloveframes.app
+productName: iloveframes
+copyright: Copyright © 2026 iloveframes
+directories:
+  output: release/${version}
+  buildResources: build
+files:
+  - out/**
+  - package.json
+  - "!**/*.map"
+extraResources:
+  - from: resources/icon.png
+    to: icon.png
+  - from: resources/native
+    to: native
+asarUnpack:
+  - node_modules/ffmpeg-static/**
+  - node_modules/uiohook-napi/**
+npmRebuild: false
+
+win:
+  icon: build/icon.png
+  target:
+    - target: nsis
+      arch: [x64]
+    - target: portable
+      arch: [x64]
+  artifactName: ${productName}-${version}-win-${arch}-${target}.${ext}
+  signAndEditExecutable: true
+nsis:
+  oneClick: false
+  perMachine: false
+  allowToChangeInstallationDirectory: true
+  createDesktopShortcut: always
+  createStartMenuShortcut: true
+  shortcutName: iloveframes
+  artifactName: ${productName}-${version}-Setup.${ext}
+portable:
+  artifactName: ${productName}-${version}-Portable.${ext}
+
+mac:
+  icon: build/icon.png
+  category: public.app-category.video
+  identity: null
+  hardenedRuntime: false
+  gatekeeperAssess: false
+  target:
+    - target: dmg
+    - target: zip
+  artifactName: ${productName}-${version}-mac-${arch}.${ext}
+  extendInfo:
+    NSCameraUsageDescription: iloveframes uses your camera for the selfie bubble in recordings.
+    NSMicrophoneUsageDescription: iloveframes records your voice-over.
+    NSScreenCaptureUsageDescription: iloveframes records your screen to create walkthrough videos.
+dmg:
+  title: iloveframes
+  iconSize: 96
+  window: { width: 540, height: 380 }
+  contents:
+    - { x: 140, y: 190 }
+    - { x: 400, y: 190, type: link, path: /Applications }
+afterPack: scripts/after-pack.cjs
+afterSign: scripts/adhoc-sign.cjs

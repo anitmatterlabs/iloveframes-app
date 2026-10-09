@@ -1,0 +1,7 @@
+node_modules
+out
+release
+.shots
+.tmp
+keys/update-private.pem
+*.log

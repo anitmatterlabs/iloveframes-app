@@ -1,0 +1,88 @@
+import { contextBridge, ipcRenderer, webUtils } from 'electron'
+import * as pipe from './exportPipe'
+
+const on = (channel: string, cb: (...args: any[]) => void) => {
+  const fn = (_e: unknown, ...args: any[]) => cb(...args)
+  ipcRenderer.on(channel, fn)
+  return () => ipcRenderer.removeListener(channel, fn)
+}
+
+const api = {
+  info: () => ipcRenderer.invoke('app:info'),
+  displays: () => ipcRenderer.invoke('displays:list'),
+  displayThumbs: (): Promise<Record<string, string>> => ipcRenderer.invoke('displays:thumbs'),
+  permStatus: () => ipcRenderer.invoke('perm:status'),
+  permRequest: (k: string) => ipcRenderer.invoke('perm:request', k),
+  rec: {
+    prepare: (o: any) => ipcRenderer.invoke('rec:prepare', o),
+    chunk: (kind: string, data: ArrayBuffer) => ipcRenderer.send('rec:chunk', kind, data),
+    requestStop: () => ipcRenderer.send('rec:request-stop'),
+    cancel: () => ipcRenderer.send('rec:cancel'),
+    finalize: (m: any) => ipcRenderer.invoke('rec:finalize', m),
+    onStop: (cb: () => void) => on('rec:stop', cb),
+    onCancelled: (cb: () => void) => on('rec:cancelled', cb),
+    onProcessing: (cb: (msg: string) => void) => on('rec:processing', cb)
+  },
+  projects: {
+    list: () => ipcRenderer.invoke('projects:list'),
+    load: (id: string) => ipcRenderer.invoke('project:load', id),
+    save: (id: string, patch: any) => ipcRenderer.invoke('project:save', id, patch),
+    remove: (id: string) => ipcRenderer.invoke('project:delete', id)
+  },
+  export: {
+    choose: (name: string, ext: string) => ipcRenderer.invoke('export:choose', name, ext),
+    start: (o: pipe.StartOptions) => pipe.start(o),
+    frame: (token: string, data: ArrayBuffer | Uint8Array) => pipe.frame(token, data),
+    audio: (token: string, wav: ArrayBuffer) => pipe.audio(token, wav),
+    finish: (token: string, o: { format: 'mp4' | 'gif'; gifWidth?: number; gifFps?: number }) => pipe.finish(token, o),
+    cancel: (token: string) => pipe.cancel(token),
+    onMuxProgress: (cb: (s: number) => void) => on('export:mux-progress', cb)
+  },
+  reveal: (p: string) => ipcRenderer.invoke('shell:reveal', p),
+  open: (p: string) => ipcRenderer.invoke('shell:open', p),
+  pickImage: () => ipcRenderer.invoke('file:pick-image'),
+  recordings: {
+    list: (exceptId?: string) => ipcRenderer.invoke('recordings:list', exceptId)
+  },
+  media: {
+    import: (projectId: string, paths?: string[]): Promise<import('../renderer/src/engine/types').MediaSource[]> => ipcRenderer.invoke('media:import', projectId, paths),
+    importAsProject: (paths?: string[]): Promise<string | null> => ipcRenderer.invoke('project:import-video', paths),
+    onProgress: (cb: (p: { label: string; p: number } | null) => void) => on('media:progress', cb)
+  },
+  shot: {
+    open: (): Promise<{ dataUrl: string; name: string } | null> => ipcRenderer.invoke('shot:open'),
+    load: (path: string): Promise<{ dataUrl: string; name: string } | null> => ipcRenderer.invoke('shot:load', path),
+    paste: (): Promise<{ dataUrl: string; name: string } | null> => ipcRenderer.invoke('shot:paste'),
+    save: (data: ArrayBuffer, name: string, ext: 'png' | 'jpg'): Promise<string | null> => ipcRenderer.invoke('shot:save', data, name, ext),
+    copy: (png: ArrayBuffer) => ipcRenderer.invoke('shot:copy', png)
+  },
+  updates: {
+    state: () => ipcRenderer.invoke('update:state'),
+    check: () => ipcRenderer.invoke('update:check'),
+    install: () => ipcRenderer.invoke('update:install'),
+    version: (): Promise<string> => ipcRenderer.invoke('app:version'),
+    onState: (cb: (s: any) => void) => on('update:state', cb)
+  },
+  license: {
+    status: () => ipcRenderer.invoke('license:status'),
+    activate: (key: string, name: string): Promise<{ ok: true } | { ok: false; error: string }> => ipcRenderer.invoke('license:activate', key, name),
+    deactivate: (): Promise<{ ok: true } | { ok: false; error: string }> => ipcRenderer.invoke('license:deactivate'),
+    setName: (name: string) => ipcRenderer.invoke('license:set-name', name),
+    buy: () => ipcRenderer.invoke('license:buy'),
+    onChange: (cb: (s: any) => void) => on('license:changed', cb)
+  },
+  sounds: {
+    list: (): Promise<{ id: string; name: string; file: string; duration: number }[]> => ipcRenderer.invoke('sounds:list'),
+    import: (paths?: string[]): Promise<{ id: string; name: string; file: string; duration: number }[]> => ipcRenderer.invoke('sounds:import', paths),
+    remove: (id: string) => ipcRenderer.invoke('sounds:remove', id)
+  },
+  pathForFile: (f: File) => webUtils.getPathForFile(f),
+  wallpapers: {
+    list: (): Promise<{ id: string; name: string; group: string; file: string; thumb: string; width: number; height: number }[]> => ipcRenderer.invoke('wallpapers:list'),
+    import: (group?: string, paths?: string[], names?: Record<string, string>) => ipcRenderer.invoke('wallpapers:import', group, paths, names),
+    remove: (id: string) => ipcRenderer.invoke('wallpapers:remove', id)
+  }
+}
+
+contextBridge.exposeInMainWorld('ilf', api)
+export type IlfApi = typeof api
