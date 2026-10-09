@@ -96,7 +96,9 @@ export function replayTour(name: TourName) {
 export function offerTour(name: TourName, delay = 450) {
   if (seen(name)) return
   setTimeout(() => {
-    if (!seen(name) && !useTourStore.getState().name) useTourStore.setState((s) => ({ name, run: s.run + 1 }))
+    if (seen(name) || useTourStore.getState().name) return
+    markSeen(name) // shown once: quitting mid-tour doesn't bring it back next launch
+    useTourStore.setState((s) => ({ name, run: s.run + 1 }))
   }, delay)
 }
 
@@ -105,7 +107,9 @@ export function useFirstRunTour(name: TourName, ready: boolean) {
   useEffect(() => {
     if (!ready || seen(name)) return
     const t = setTimeout(() => {
-      if (!seen(name) && !useTourStore.getState().name) useTourStore.setState((s) => ({ name, run: s.run + 1 }))
+      if (seen(name) || useTourStore.getState().name) return
+      markSeen(name) // shown once: quitting mid-tour doesn't bring it back next launch
+      useTourStore.setState((s) => ({ name, run: s.run + 1 }))
     }, 700)
     return () => clearTimeout(t)
   }, [name, ready])

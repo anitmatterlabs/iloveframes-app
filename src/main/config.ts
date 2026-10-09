@@ -8,7 +8,7 @@ export const CONFIG = {
    * Optional: only accept license keys issued for this Dodo product (pdt_...).
    * Leave empty to accept any active key from your Dodo business.
    */
-  dodoProductId: '',
+  dodoProductId: 'pdt_0NpLA3i8vVdDYwrZbdXJ6', // iloveframes Lifetime (live)
   /** Where "Buy a license" sends people (your Dodo checkout / payment link). */
   buyUrl: 'https://iloveframes.app/buy',
 
