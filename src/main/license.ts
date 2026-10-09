@@ -119,7 +119,11 @@ async function syncClock() {
 }
 
 // ------------------------------------------------------------------ dodo
-const api = () => (CONFIG.dodoEnv === 'live' ? 'https://live.dodopayments.com' : 'https://test.dodopayments.com')
+// Dev-only overrides for testing against Dodo test mode; installed builds always use CONFIG.
+const dev = (k: string) => (app.isPackaged ? undefined : process.env[k])
+const dodoEnv = () => (dev('ILF_DODO_ENV') === 'test' ? 'test' : CONFIG.dodoEnv)
+const productId = () => dev('ILF_DODO_PRODUCT') ?? CONFIG.dodoProductId
+const api = () => (dodoEnv() === 'live' ? 'https://live.dodopayments.com' : 'https://test.dodopayments.com')
 
 async function post(path: string, body: unknown): Promise<{ status: number; json: any }> {
   const ctrl = new AbortController()
@@ -175,6 +179,8 @@ async function revalidate() {
       online = true
     } else if (r.status === 200 && r.json?.valid === false) {
       state.license = undefined // revoked, refunded, expired or deactivated elsewhere
+      // give the seat back so it doesn't count against the customer's device limit
+      post('/licenses/deactivate', { license_key: L.key, license_key_instance_id: L.instanceId }).catch(() => {})
     }
   } catch {
     // offline: keep it until the grace period runs out
@@ -199,7 +205,8 @@ export async function activate(rawKey: string, name: string): Promise<{ ok: true
   if (r.status === 422) return { ok: false, error: 'This key has reached its device limit. Deactivate it on another computer first.' }
   if (r.status !== 200 && r.status !== 201) return { ok: false, error: `Activation failed (${r.status}). Please try again.` }
   const inst = r.json
-  if (CONFIG.dodoProductId && inst?.product?.product_id && inst.product.product_id !== CONFIG.dodoProductId) {
+  // keys from any other product (or another Dodo business) are refused and the seat is given back
+  if (productId() && inst?.product?.product_id !== productId()) {
     await post('/licenses/deactivate', { license_key: licenseKey, license_key_instance_id: inst.id }).catch(() => {})
     return { ok: false, error: 'This key belongs to a different product.' }
   }

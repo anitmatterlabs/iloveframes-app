@@ -547,3 +547,28 @@ module.exports.brandui = async (app, win, out) => {
   await win.waitForTimeout(1200)
   await win.screenshot({ path: path.join(out, 'b-account.png') })
 }
+// License flow against Dodo test mode. STEP=activate|restart|after; keys via env.
+module.exports.lic = async (app, win, out) => {
+  const st = () => win.evaluate(() => window.ilf.license.status())
+  const show = (label, s) => console.log('STATUS', label, JSON.stringify({ state: s.state, key: s.license?.keyMasked, email: s.license?.customerEmail, name: s.name }))
+  const step = process.env.STEP
+  show('start', await st())
+  if (step === 'activate') {
+    for (const [label, key] of [['fake', 'ILF-FAKE0-FAKE0-FAKE0-FAKE0'], ['tooShort', 'abc'], ['otherProduct', process.env.K_OTHER], ['limitReached', process.env.K_LIMIT], ['disabled', process.env.K_DISABLED]].filter(([, k]) => k)) {
+      const r = await win.evaluate(([k]) => window.ilf.license.activate(k, 'Abhi'), [key])
+      console.log('ACTIVATE', label, JSON.stringify(r))
+    }
+    show('afterBad', await st())
+    const r = await win.evaluate(([k]) => window.ilf.license.activate(k, 'Abhi'), [process.env.K_MAIN])
+    console.log('ACTIVATE main', JSON.stringify(r))
+    show('afterMain', await st())
+  }
+  if (step === 'deactivate') {
+    const r = await win.evaluate(() => window.ilf.license.deactivate())
+    console.log('DEACTIVATE', JSON.stringify(r))
+    show('afterDeactivate', await st())
+  }
+  await win.evaluate(() => { location.hash = '/account' })
+  await win.waitForTimeout(1500)
+  await win.screenshot({ path: path.join(out, `lic-${step}.png`) })
+}
