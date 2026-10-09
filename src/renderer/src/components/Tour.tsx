@@ -14,6 +14,8 @@ export type PanelTour = 'tab-clips' | 'tab-background' | 'tab-frame' | 'tab-curs
 export type TourName = 'home' | 'editor' | PanelTour
 interface Step {
   target?: string
+  /** editor tab to open while this card is showing */
+  tab?: 'clips' | 'background' | 'frame' | 'cursor' | 'zoom' | 'camera' | 'audio'
   title: string
   body: React.ReactNode
 }
@@ -29,10 +31,21 @@ export const TOURS: Record<TourName, Step[]> = {
     { target: 'account', title: 'Account & help', body: 'Your license lives here, and the ? button replays this tour whenever you like.' }
   ],
   editor: [
-    { target: 'preview', title: 'Already polished', body: <>This is your finished video. <kbd className="tour-kbd">Space</kbd> plays it, and the export looks exactly like this.</> },
-    { target: 'timeline', title: 'The timeline', body: <>Drag zooms to move them, double-click a lane to add one, and press <kbd className="tour-kbd">S</kbd> to split a clip.</> },
-    { target: 'inspector', title: 'Make it yours', body: 'Background, frame, cursor, zoom, camera, sounds and clips each have a tab. Tap the ? at the top of any tab for a quick guide.' },
-    { target: 'export', title: 'Share it', body: 'Export an MP4 up to 4K at 60fps, or a GIF for docs.' }
+    { target: 'preview', title: 'Your video, already polished', body: 'This is exactly what you’ll export: zooms, cursor, background and all. Click it to play or pause.' },
+    { target: 'transport', title: 'Play and navigate', body: <><kbd className="tour-kbd">Space</kbd> plays. <kbd className="tour-kbd">←</kbd> <kbd className="tour-kbd">→</kbd> step a frame, add <kbd className="tour-kbd">Shift</kbd> to jump a second.</> },
+    { target: 'tools', title: 'Quick tools', body: <>Split at the playhead <kbd className="tour-kbd">S</kbd>, delete a clip, add a zoom <kbd className="tour-kbd">Z</kbd>, hide the cursor, import a clip, or preview full screen <kbd className="tour-kbd">F</kbd>.</> },
+    { target: 'lane-clips', title: 'Clips', body: 'Drag a clip to reorder it, drag its edges to trim. The round button between two clips adds a transition.' },
+    { target: 'lane-zoom', title: 'Zooms', body: 'Each purple block is a zoom. Drag to move, pull the edges to stretch, double-click empty space to add one.' },
+    { target: 'lane-hide', title: 'Cursor', body: 'Double-click this lane to hide the cursor for a stretch, like while you type a password.' },
+    { target: 'lane-audio', title: 'Sounds & music', body: 'Drop music or a voice-over here from the Audio tab or straight from your computer.' },
+    { target: 'inspector', tab: 'clips', title: 'Clips panel', body: 'Import videos, add earlier recordings with their smart data, and pick transitions.' },
+    { target: 'inspector', tab: 'background', title: 'Background', body: 'Wallpapers, studio backgrounds, gradients, or your own photo.' },
+    { target: 'inspector', tab: 'frame', title: 'Frame', body: 'Aspect ratio for every platform, crop, padding, rounded corners and shadow.' },
+    { target: 'inspector', tab: 'cursor', title: 'Cursor', body: 'Style, size and smoothing, click effects, and hiding it while you type.' },
+    { target: 'inspector', tab: 'zoom', title: 'Zoom', body: 'Regenerate smart zooms, set the speed, choose follow-cursor or a fixed point.' },
+    { target: 'inspector', tab: 'camera', title: 'Camera', body: 'Your webcam bubble: shape, corner and size.' },
+    { target: 'inspector', tab: 'audio', title: 'Audio', body: 'Mic volume, click, typing and zoom sounds, and your own audio.' },
+    { target: 'export', title: 'Share it', body: 'Export an MP4 up to 4K at 60fps, or a GIF. Tap ? on any panel later for a closer look.' }
   ],
   // one short guide per editor tab, shown the first time each tab is opened
   'tab-clips': [
@@ -160,6 +173,21 @@ function TourRun() {
     [i, steps, end]
   )
 
+  // open the tab this card talks about; its own deeper guide then isn't needed on first visit
+  useEffect(() => {
+    if (!step?.tab) return
+    window.dispatchEvent(new CustomEvent('ilf:tab', { detail: step.tab }))
+    markSeen(`tab-${step.tab}` as TourName)
+  }, [step])
+
+  // a tour belongs to the screen it started on
+  useEffect(() => {
+    if (!name) return
+    const close = () => useTourStore.setState({ name: null })
+    addEventListener('hashchange', close)
+    return () => removeEventListener('hashchange', close)
+  }, [name])
+
   // first step might itself be missing
   useEffect(() => {
     if (step?.target && !findTarget(step.target)) go(1, i)
@@ -286,20 +314,30 @@ function TourRun() {
               </motion.div>
             </AnimatePresence>
             <div className="mt-4 flex items-center gap-2">
-              <div className="flex flex-1 items-center gap-1.5">
-                {visible.map((s, k) => (
-                  <span key={s.title} className={cn('h-1.5 rounded-full transition-all duration-300', k === pos ? 'w-5 bg-brand' : k < pos ? 'w-1.5 bg-white/40' : 'w-1.5 bg-white/15')} />
-                ))}
+              <div className="flex min-w-0 flex-1 items-center gap-1.5">
+                {visible.length > 8 ? (
+                  // long tours: a calm counter plus a thin progress line instead of a row of dots
+                  <div className="flex w-full items-center gap-2.5">
+                    <span className="shrink-0 text-[11px] font-medium tabular-nums text-zinc-500">{pos + 1} / {visible.length}</span>
+                    <span className="relative h-1 max-w-[90px] flex-1 overflow-hidden rounded-full bg-white/10">
+                      <span className="bg-brand absolute inset-y-0 left-0 rounded-full transition-[width] duration-300" style={{ width: `${((pos + 1) / visible.length) * 100}%` }} />
+                    </span>
+                  </div>
+                ) : (
+                  visible.map((s, k) => (
+                    <span key={s.title + k} className={cn('h-1.5 shrink-0 rounded-full transition-all duration-300', k === pos ? 'w-5 bg-brand' : k < pos ? 'w-1.5 bg-white/40' : 'w-1.5 bg-white/15')} />
+                  ))
+                )}
               </div>
-              <button onClick={end} className="h-8 rounded-lg px-2.5 text-[12px] font-medium text-zinc-500 transition-colors hover:bg-white/[0.06] hover:text-zinc-200">
+              <button onClick={end} className="h-8 shrink-0 rounded-lg px-2.5 text-[12px] font-medium text-zinc-500 transition-colors hover:bg-white/[0.06] hover:text-zinc-200">
                 Skip
               </button>
               {pos > 0 && (
-                <button onClick={() => go(-1)} title="Back" className="grid h-8 w-8 place-items-center rounded-lg text-zinc-400 ring-1 ring-white/10 transition-colors hover:bg-white/[0.06] hover:text-white">
+                <button onClick={() => go(-1)} title="Back" className="grid h-8 w-8 shrink-0 place-items-center rounded-lg text-zinc-400 ring-1 ring-white/10 transition-colors hover:bg-white/[0.06] hover:text-white">
                   <ArrowLeft className="h-3.5 w-3.5" />
                 </button>
               )}
-              <button onClick={() => go(1)} className="bg-brand flex h-8 items-center gap-1.5 rounded-lg px-3.5 text-[12px] font-semibold text-white shadow-glow transition-[filter] hover:brightness-110">
+              <button onClick={() => go(1)} className="bg-brand flex h-8 shrink-0 items-center gap-1.5 rounded-lg px-3.5 text-[12px] font-semibold text-white shadow-glow transition-[filter] hover:brightness-110">
                 {last ? 'Done' : pos === 0 && !step.target ? 'Show me' : 'Next'}
                 {!last && <ArrowRight className="h-3.5 w-3.5" />}
               </button>

@@ -962,6 +962,16 @@ export function Inspector() {
   const active: Tab = selected && tab !== 'zoom' ? tab : tab
   const Panel = { clips: ClipsPanel, background: BackgroundPanel, frame: FramePanel, cursor: CursorPanel, zoom: ZoomPanel, camera: CameraPanel, audio: AudioPanel }[active]
 
+  // the editor walkthrough opens each tab as it explains it
+  useEffect(() => {
+    const on = (e: Event) => {
+      const id = (e as CustomEvent<Tab>).detail
+      if (TABS.some((t) => t.id === id)) setTab(id)
+    }
+    window.addEventListener('ilf:tab', on)
+    return () => window.removeEventListener('ilf:tab', on)
+  }, [])
+
   // jump to zoom tab when a segment gets selected
   const [lastSel, setLastSel] = useState<string | null>(null)
   if (selected !== lastSel) {

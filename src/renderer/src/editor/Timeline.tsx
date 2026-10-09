@@ -251,6 +251,7 @@ export function Timeline() {
     const free = hoverT !== null && hoverLane === o.lane && !o.items.some((s) => hoverT >= s.start - 0.3 && hoverT <= s.end + 0.3)
     return (
       <div
+        data-tour={`lane-${o.lane}`}
         className="absolute rounded-xl bg-white/[0.02] ring-1 ring-white/[0.05]"
         style={{ left: xOf(0), width: inner, top: o.top, height: o.height }}
         onPointerEnter={() => setHoverLane(o.lane)}
@@ -380,7 +381,8 @@ export function Timeline() {
             <div className="mt-1 flex h-8 items-center gap-1.5 text-[11px] font-medium text-zinc-500"><AudioLines className="h-3.5 w-3.5" /> Audio</div>
           </div>
 
-          {/* sequence: clips back to back */}
+          {/* sequence: clips back to back (the anchor lets the walkthrough point at the whole row) */}
+          <div data-tour="lane-clips" className="pointer-events-none absolute top-10 h-14 rounded-xl" style={{ left: xOf(0), width: inner }} />
           {edit.clips.map((c, i) => {
             const src = sourceInfo(project, c.source)
             if (!src) return null
@@ -488,6 +490,7 @@ export function Timeline() {
 
           {/* audio lane: drop sounds here */}
           <div
+            data-tour="lane-audio"
             className={cn('absolute rounded-xl ring-1 transition-colors', dropT !== null ? 'bg-brand-rose/[0.08] ring-brand-rose/50' : 'bg-white/[0.02] ring-white/[0.05]')}
             style={{ left: xOf(0), width: inner, top: 192, height: 34 }}
             onPointerDown={(e) => {

@@ -58,7 +58,7 @@ function Transport({ onToast }: { onToast: (m: string) => void }) {
           <span className="text-zinc-500"> / {fmtTime(total, true)}</span>
         </div>
       </div>
-      <div className="flex flex-1 items-center justify-center gap-2">
+      <div data-tour="transport" className="flex flex-1 items-center justify-center gap-2">
         <Tip content="Back to start">
           <Button variant="ghost" size="icon" onClick={() => player.seek(0)}><SkipBack className="h-4 w-4" /></Button>
         </Tip>
@@ -70,7 +70,7 @@ function Transport({ onToast }: { onToast: (m: string) => void }) {
         </Tip>
       </div>
       <div className="flex w-[240px] items-center justify-end">
-        <div className="flex items-center gap-0.5 rounded-xl border border-white/[0.06] bg-white/[0.03] p-1">
+        <div data-tour="tools" className="flex items-center gap-0.5 rounded-xl border border-white/[0.06] bg-white/[0.03] p-1">
           <ToolBtn tip="Split at playhead (S)" onClick={() => onToast(splitAtPlayhead() ? 'Clip split at ' + fmtTime(useEditor.getState().time, true) : 'Move the playhead inside a clip to split')}>
             <Scissors className="h-4 w-4" />
           </ToolBtn>
