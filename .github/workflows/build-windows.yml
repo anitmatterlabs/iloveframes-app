@@ -1,0 +1,39 @@
+# Builds the Windows installer (.exe, NSIS) and the portable .exe.
+# Runs on every version tag and on demand (Actions → Build Windows → Run workflow).
+name: Build Windows
+
+on:
+  workflow_dispatch:
+  push:
+    tags: ['v*']
+
+jobs:
+  windows:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Type check
+        run: npm run typecheck
+
+      - name: Build app
+        run: npx electron-vite build
+
+      - name: Package (.exe installer + portable)
+        run: npx electron-builder --win --x64 --publish never
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: iloveframes-windows-x64
+          path: |
+            release/*/*-Setup.exe
+            release/*/*-Portable.exe
+          if-no-files-found: error

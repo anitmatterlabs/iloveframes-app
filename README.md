@@ -29,8 +29,21 @@ Installed apps check every 4 hours, download in the background, verify the Ed255
 
 **Keep `keys/update-private.pem` secret and backed up.** Without it you can't sign updates; if it leaks, someone could sign one.
 
-## Platform code
-OS-specific plumbing lives in `src/main/platform/win.ts` and `src/main/platform/mac.ts` behind one interface (`platform/types.ts`); the cursor-shape helpers are `resources/native/cursor-win.ps1` and `cursor-mac.js`. Features are identical on both.
+## Platform code (Windows vs macOS)
+One codebase, two platforms. About 95% of the app is shared; everything that differs sits behind one interface so the two builds never drift apart.
+
+| Area | Windows | macOS | Shared |
+|---|---|---|---|
+| OS plumbing (capture devices, cursor watcher, machine id, licence mirror, update install) | `src/main/platform/win.ts` | `src/main/platform/mac.ts` | contract in `src/main/platform/types.ts`, picked in `platform/index.ts` |
+| Cursor-shape helper | `resources/native/cursor-win.ps1` | `resources/native/cursor-mac.js` | |
+| Screen capture backend | ffmpeg `ddagrab` / `gdigrab` | ffmpeg `avfoundation` | `src/main/recorder.ts`, `src/main/ffmpeg.ts` |
+| Installer | NSIS `.exe` + portable `.exe` (`electron-builder.yml` → `win`, `nsis`, `portable`) | `.dmg` + `.zip`, ad-hoc signed (`mac`, `dmg`, `scripts/adhoc-sign.cjs`) | |
+| CI build | `.github/workflows/build-windows.yml` | `.github/workflows/build-mac.yml` | |
+| In-app update asset | `win` (Setup.exe, run silently) | `mac-arm64` / `mac-x64` (.zip, bundle swap) | signed `latest.json`, `src/main/updater.ts` |
+
+Editor, engine, UI, licensing, recording data and export (`src/renderer`, `src/main/index.ts`, `src/main/license.ts`, `src/main/ilfdata.ts`) are identical on both.
+
+Releases: every version is tagged `vX.Y.Z` and has a GitHub Release with the Windows and macOS files grouped separately.
 
 ## macOS first launch
 The app is ad-hoc signed (no Apple Developer certificate). First launch: right-click the app → **Open**, or System Settings → Privacy & Security → **Open Anyway**. Then allow **Screen Recording** and **Accessibility** (for click capture) when asked.
