@@ -15,6 +15,8 @@ import { runFfmpeg, LiveCapture, captureOutput, cropFilter, type CropFrac } from
 import { initLicense, status as licenseStatus, isUnlocked, activate as licenseActivate, deactivate as licenseDeactivate, setName as licenseSetName } from './license'
 import { importWallpapers, listWallpapers, removeWallpaper, importSounds, listSounds, removeSound, bundledWallpaperDir } from './library'
 import { appendRecData, readRecData, readSiblingProject, nextNumber, peekName, commitName, pad3 } from './ilfdata'
+import { initAgentBridge } from './agent'
+import { initTelemetry, track, trackOnce } from './telemetry'
 
 const isMac = process.platform === 'darwin'
 const devUrl = process.env['ELECTRON_RENDERER_URL']
@@ -227,6 +229,7 @@ ipcMain.handle('rec:prepare', async (_e, opts: { displayId: string; countdown: n
   await fsp.mkdir(dir, { recursive: true })
   const name = projectName(id)
 
+  track('recording_started', { fps: opts.fps, area: !!opts.area, mode: opts.mode, countdown: opts.countdown })
   mainWin?.hide()
   await showCountdown(display, opts.countdown)
 
@@ -306,6 +309,7 @@ ipcMain.on('area:done', (_e, area: { x: number; y: number; w: number; h: number 
 
 ipcMain.on('rec:cancel', async () => {
   if (!rec) return
+  track('recording_cancelled')
   const r = rec
   r.stopping = true
   r.tracker.stop()
@@ -337,7 +341,7 @@ ipcMain.handle('rec:finalize', async (_e, meta: { cameraStart?: number; micStart
   }
   if (meta.hasCamera && existsSync(join(r.dir, 'camera.webm'))) {
     mainWin?.webContents.send('rec:processing', 'Processing camera')
-    await runFfmpeg(['-i', join(r.dir, 'camera.webm'), '-c:v', 'libx264', '-preset', 'veryfast', '-crf', '17', '-pix_fmt', 'yuv420p', '-vf', 'scale=trunc(iw/2)*2:trunc(ih/2)*2', '-g', '30', '-an', '-movflags', '+faststart', join(r.dir, 'camera.mp4')])
+    await runFfmpeg(['-i', join(r.dir, 'camera.webm'), '-c:v', 'libx264', '-preset', 'veryfast', '-crf', '17', '-pix_fmt', 'yuv420p', '-vf', 'scale=trunc(iw/2)*2:trunc(ih/2)*2', '-g', '10', '-an', '-movflags', '+faststart', join(r.dir, 'camera.mp4')])
   }
   if (meta.hasMic && existsSync(join(r.dir, 'mic.webm'))) {
     mainWin?.webContents.send('rec:processing', 'Processing audio')
@@ -399,6 +403,7 @@ ipcMain.handle('rec:finalize', async (_e, meta: { cameraStart?: number; micStart
   await fsp.writeFile(join(r.dir, 'project.json'), JSON.stringify(project))
   for (const f of ['camera.webm', 'mic.webm']) await fsp.rm(join(r.dir, f), { force: true }).catch(() => {})
   rec = null
+  track('recording_finished', { dur: duration, camera: !!camera, mic: !!mic, area: !!r.area, engine: r.engine, mode: r.mode })
   return { ...project, dir: r.dir }
 })
 
@@ -448,7 +453,8 @@ async function packRecording(dir: string, screenFile: string, duration: number, 
 // ---------------------------------------------------------------------------
 // Projects
 // ---------------------------------------------------------------------------
-ipcMain.handle('projects:list', async () => {
+ipcMain.handle('projects:list', () => listProjects())
+async function listProjects() {
   const root = projectsRoot()
   const out: any[] = []
   for (const id of await fsp.readdir(root).catch(() => [] as string[])) {
@@ -465,7 +471,7 @@ ipcMain.handle('projects:list', async () => {
     } catch {}
   }
   return out.sort((a, b) => b.createdAt - a.createdAt)
-})
+}
 
 ipcMain.handle('project:load', async (_e, id: string) => {
   const dir = join(projectsRoot(), basename(id))
@@ -520,6 +526,15 @@ ipcMain.handle('export:choose', async (_e, _hint: string, ext: 'mp4' | 'gif') =>
   if (r.canceled || !r.filePath) return null
   await commitName('vid', basename(r.filePath, extname(r.filePath)))
   return r.filePath
+})
+
+/** Where an agent's export goes: Downloads, next ilfvid_NNN. Same license rule as the export dialog. */
+ipcMain.handle('agent:export-target', async (_e, ext: 'mp4' | 'gif') => {
+  requireUnlocked()
+  const dir = process.env.ILF_EXPORT_DIR || app.getPath('downloads')
+  const name = await peekName('vid', [dir])
+  await commitName('vid', name)
+  return join(dir, name + '.' + (ext === 'gif' ? 'gif' : 'mp4'))
 })
 
 // ---------------------------------------------------------------------------
@@ -810,17 +825,33 @@ ipcMain.handle('sounds:import', async (_e, paths?: string[]) => {
 // ---------------------------------------------------------------------------
 // Licensing
 // ---------------------------------------------------------------------------
-ipcMain.handle('license:status', () => licenseStatus())
-ipcMain.handle('license:activate', (_e, key: string, name: string) => licenseActivate(String(key ?? ''), String(name ?? '')))
-ipcMain.handle('license:deactivate', () => licenseDeactivate())
+ipcMain.handle('license:status', () => {
+  const st = licenseStatus()
+  if (st.state === 'expired') trackOnce('trial_expired', 'trial_expired')
+  return st
+})
+ipcMain.handle('license:activate', async (_e, key: string, name: string) => {
+  const r = await licenseActivate(String(key ?? ''), String(name ?? ''))
+  track(r.ok ? 'license_activated' : 'license_activate_failed', r.ok ? undefined : { msg: (r as any).error })
+  return r
+})
+ipcMain.handle('license:deactivate', async () => {
+  const r = await licenseDeactivate()
+  if (r.ok) track('license_deactivated')
+  return r
+})
 ipcMain.handle('license:set-name', (_e, name: string) => licenseSetName(String(name ?? '')))
 ipcMain.on('license:allowed', (e) => (e.returnValue = isUnlocked()))
-ipcMain.handle('license:buy', () => shell.openExternal(CONFIG.buyUrl))
+ipcMain.handle('license:buy', () => {
+  track('buy_click')
+  return shell.openExternal(CONFIG.buyUrl)
+})
 
 // In-app feedback: posted from main so it isn't subject to page CORS rules.
 ipcMain.handle('feedback:send', async (_e, f: { kind?: string; message?: string; email?: string; name?: string }) => {
   const message = String(f?.message ?? '').trim().slice(0, 4000)
   if (message.length < 3) return { ok: false, error: 'Please write a little more.' }
+  track('feedback_sent', { kind: String(f?.kind ?? 'idea').slice(0, 20) })
   const body = {
     kind: String(f?.kind ?? 'idea').slice(0, 20),
     message,
@@ -895,7 +926,9 @@ function requireUnlocked() {
 }
 
 app.whenReady().then(async () => {
+  initAgentBridge({ window: () => mainWin, listProjects })
   await initLicense()
+  initTelemetry({ license: () => { const st = licenseStatus().state; return st === 'licensed' ? 'pro' : st } })
   startAutoUpdates()
   registerMediaProtocol()
   session.defaultSession.setPermissionRequestHandler((_wc, _perm, cb) => cb(true))

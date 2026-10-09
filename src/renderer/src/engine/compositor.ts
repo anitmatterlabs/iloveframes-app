@@ -2,6 +2,7 @@ import type { Aspect, EditState, Project, TransitionKind } from './types'
 import { backgroundCanvas, makeCanvas, type AnyCanvas } from './backgrounds'
 import { MotionTracks, clamp, easeOutCubic, lerp } from './motion'
 import { drawMacCursor, type CursorKind } from './cursors'
+import { DEVICE_FRAMES_ENABLED, deviceLayout, paintDevice, paintScreenOverlay, type DeviceLayout } from './devices'
 
 type Ctx = CanvasRenderingContext2D | OffscreenCanvasRenderingContext2D
 
@@ -68,9 +69,11 @@ function roundRectPath(ctx: Ctx, x: number, y: number, w: number, h: number, r: 
 
 /** Background + shadow layers, cached by look. Two slots so transitions between differently sized clips don't thrash. */
 const layers: { key: string; c: AnyCanvas }[] = []
-function staticLayer(edit: EditState, W: number, H: number, fr: { x: number; y: number; w: number; h: number }, radius: number, k: number) {
+function staticLayer(edit: EditState, W: number, H: number, L: Layout) {
+  const { fr, radius, k } = L
   const bgKey = edit.background.kind === 'image' ? edit.background.value.length + edit.background.value.slice(-48) : edit.background.value
-  const key = [edit.background.kind, bgKey, edit.background.blur, W, H, fr.x.toFixed(1), fr.y.toFixed(1), fr.w.toFixed(1), fr.h.toFixed(1), radius, edit.shadow, edit.padding].join('|')
+  const dev = L.dev ? L.dev.kind + L.dev.color : ''
+  const key = [edit.background.kind, bgKey, edit.background.blur, W, H, fr.x.toFixed(1), fr.y.toFixed(1), fr.w.toFixed(1), fr.h.toFixed(1), radius, edit.shadow, edit.padding, dev].join('|')
   const hit = layers.find((l) => l.key === key)
   if (hit) return hit.c
   const bg = backgroundCanvas(edit.background, W, H)
@@ -80,7 +83,8 @@ function staticLayer(edit: EditState, W: number, H: number, fr: { x: number; y: 
   const ctx = c.getContext('2d') as Ctx
   ctx.clearRect(0, 0, W, H)
   ctx.drawImage(bg, 0, 0, W, H)
-  if (edit.shadow > 0 && edit.padding > 0.005) {
+  if (L.dev) paintDevice(ctx, L.dev, edit.shadow, k)
+  else if (edit.shadow > 0 && edit.padding > 0.005) {
     ctx.save()
     roundRectPath(ctx, fr.x, fr.y, fr.w, fr.h, radius)
     ctx.shadowColor = `rgba(0,0,0,${0.55 * edit.shadow})`
@@ -150,6 +154,8 @@ interface Layout {
   oy: number
   fr: Rect
   radius: number
+  /** set when the recording is shown on a device; fr is then its screen */
+  dev?: DeviceLayout
 }
 
 function layout(edit: EditState, W: number, H: number, src: FrameSources): Layout {
@@ -159,12 +165,18 @@ function layout(edit: EditState, W: number, H: number, src: FrameSources): Layou
   const c = src.crop ?? { x: 0, y: 0, w: 1, h: 1 }
   const vw = fw * c.w
   const vh = fh * c.h
+  const dk = edit.device?.kind
+  if (DEVICE_FRAMES_ENABLED && dk && dk !== 'none') {
+    const pad = edit.padding * Math.min(W, H)
+    const dev = deviceLayout(dk, edit.device!.color, { x: pad, y: pad, w: W - pad * 2, h: H - pad * 2 }, vw / vh)
+    return { k, vw, vh, ox: fw * c.x, oy: fh * c.y, fr: dev.content, radius: dev.contentR, dev }
+  }
   return { k, vw, vh, ox: fw * c.x, oy: fh * c.y, fr: frameRect(edit, W, H, vw, vh), radius: edit.radius * k * (edit.padding < 0.005 ? 0 : 1) }
 }
 
 /** Background + drop shadow: never change over time, painted once and blitted. */
 function paintStatic(ctx: Ctx, edit: EditState, W: number, H: number, L: Layout, alpha = 1) {
-  const layer = staticLayer(edit, W, H, L.fr, L.radius, L.k)
+  const layer = staticLayer(edit, W, H, L)
   ctx.globalAlpha = alpha
   if (layer) ctx.drawImage(layer, 0, 0)
   else {
@@ -236,6 +248,7 @@ function paintWindow(ctx: Ctx, t: number, edit: EditState, tracks: MotionTracks,
 }
 
 function paintInset(ctx: Ctx, edit: EditState, L: Layout) {
+  if (L.dev) return paintScreenOverlay(ctx, L.dev)
   if (!edit.inset || edit.padding <= 0.005) return
   const { fr, radius, k } = L
   ctx.save()

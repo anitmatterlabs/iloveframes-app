@@ -7,6 +7,9 @@ const on = (channel: string, cb: (...args: any[]) => void) => {
   return () => ipcRenderer.removeListener(channel, fn)
 }
 
+type Launch = { command: string; args: string[] }
+export type AgentStatus = { enabled: boolean; port: number | null; lastCall: { tool: string; at: number } | null; launch: { app: Launch; node: Launch; script: string } }
+
 const api = {
   info: () => ipcRenderer.invoke('app:info'),
   displays: () => ipcRenderer.invoke('displays:list'),
@@ -62,6 +65,19 @@ const api = {
     install: () => ipcRenderer.invoke('update:install'),
     version: (): Promise<string> => ipcRenderer.invoke('app:version'),
     onState: (cb: (s: any) => void) => on('update:state', cb)
+  },
+  telemetry: {
+    track: (name: string, props?: Record<string, unknown>) => ipcRenderer.send('telemetry:track', name, props),
+    get: (): Promise<{ optOut: boolean }> => ipcRenderer.invoke('telemetry:get'),
+    set: (optOut: boolean): Promise<{ optOut: boolean }> => ipcRenderer.invoke('telemetry:set', optOut)
+  },
+  agent: {
+    status: (): Promise<AgentStatus> => ipcRenderer.invoke('agent:status'),
+    setEnabled: (on: boolean): Promise<AgentStatus> => ipcRenderer.invoke('agent:set-enabled', on),
+    onCall: (cb: (c: { id: string; tool: string; args: any }) => void) => on('agent:call', cb),
+    onActivity: (cb: (a: { tool: string; at: number }) => void) => on('agent:activity', cb),
+    result: (id: string, r: unknown) => ipcRenderer.send('agent:result', id, r),
+    exportTarget: (ext: 'mp4' | 'gif'): Promise<string> => ipcRenderer.invoke('agent:export-target', ext)
   },
   license: {
     status: () => ipcRenderer.invoke('license:status'),

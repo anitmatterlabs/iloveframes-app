@@ -3,6 +3,7 @@ import { create } from 'zustand'
 import { AnimatePresence, motion } from 'framer-motion'
 import { ArrowLeft, ArrowRight, X } from 'lucide-react'
 import { cn, modKey } from '@/lib/utils'
+import { track } from '@/lib/telemetry'
 import { LogoMark } from './Brand'
 
 /**
@@ -157,17 +158,20 @@ function TourRun() {
   const steps = name ? TOURS[name] : []
   const step = steps[i]
 
-  const end = useCallback(() => {
-    if (name) markSeen(name)
+  const end = useCallback((done?: unknown) => {
+    if (name) {
+      markSeen(name)
+      track(done === true ? 'tour_finished' : 'tour_skipped', { tour: name, step: i })
+    }
     useTourStore.setState({ name: null })
-  }, [name])
+  }, [name, i])
 
   // skip over steps whose element isn't on screen
   const go = useCallback(
     (dir: 1 | -1, from = i) => {
       let j = from + dir
       while (j >= 0 && j < steps.length && steps[j].target && !findTarget(steps[j].target)) j += dir
-      if (j >= steps.length) return end()
+      if (j >= steps.length) return end(true)
       if (j < 0) return
       setI(j)
     },

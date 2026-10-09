@@ -1,7 +1,8 @@
 import { useEffect, useRef, useState } from 'react'
 import { AnimatePresence, motion } from 'framer-motion'
-import { BadgeCheck, BookOpen, Check, Clock, Download, KeyRound, LifeBuoy, Loader2, LogOut, MessageSquareHeart, Monitor, Pencil, PlayCircle, RefreshCw, ShieldCheck, Sparkles, X } from 'lucide-react'
+import { BadgeCheck, Bot, BookOpen, Check, Clock, Copy, Download, KeyRound, LifeBuoy, Loader2, LogOut, MessageSquareHeart, Monitor, Pencil, PlayCircle, RefreshCw, ShieldCheck, Sparkles, X } from 'lucide-react'
 import { Button } from '@/components/ui/button'
+import { Switch } from '@/components/ui/switch'
 import { LogoMark } from '@/components/Brand'
 import { cn } from '@/lib/utils'
 import { fmtRemaining, useLicense, useTrialRemaining } from '@/lib/license'
@@ -56,7 +57,7 @@ function ActivateForm({ compact }: { compact?: boolean }) {
       <div className="flex items-center justify-between gap-3 text-[11.5px] text-zinc-500">
         <span>Your key arrives by email right after purchase.</span>
         <button onClick={() => window.ilf.license.buy()} className="shrink-0 whitespace-nowrap font-medium text-brand-lilac transition-colors hover:text-white">
-          Get lifetime · <s className="text-zinc-600">$24</s> $12
+          Get lifetime · <span className="text-brand-orchid">on sale</span>
         </button>
       </div>
     </div>
@@ -287,12 +288,106 @@ export function AccountPanel() {
         </div>
       </Card>
 
+      <UsageStatsCard />
+
+      <AgentsCard />
+
       <UpdatesCard />
 
       <div className="pt-2 text-center text-[11px] text-zinc-600">
         iloveframes {ver} · made with love ·{' '}
         <button className="underline-offset-2 hover:text-zinc-300 hover:underline" onClick={() => window.open(SITE)}>iloveframes.app</button>
       </div>
+    </div>
+  )
+}
+
+/** Anonymous usage stats: on by default, one switch to turn off. */
+function UsageStatsCard() {
+  const [on, setOn] = useState<boolean | null>(null)
+  useEffect(() => {
+    window.ilf.telemetry.get().then((r) => setOn(!r.optOut))
+  }, [])
+  return (
+    <div className="rounded-[22px] border border-white/[0.07] bg-white/[0.02] p-5">
+      <div className="flex items-start justify-between gap-4">
+        <div className="flex gap-3">
+          <span className="grid h-9 w-9 shrink-0 place-items-center rounded-xl bg-white/[0.05] ring-1 ring-white/[0.06]"><ShieldCheck className="h-4 w-4 text-emerald-300" /></span>
+          <div>
+            <div className="text-[13px] font-semibold text-white">Share anonymous usage stats</div>
+            <div className="mt-0.5 text-[12px] leading-snug text-zinc-500">Helps us see which features people use and catch export problems. Anonymous: no name, email, files or recordings, ever. A few small updates a day.</div>
+          </div>
+        </div>
+        <Switch checked={!!on} disabled={on === null} onCheckedChange={async (v) => setOn(!(await window.ilf.telemetry.set(!v)).optOut)} aria-label="Share anonymous usage stats" />
+      </div>
+    </div>
+  )
+}
+
+/** Turn on the local bridge so AI agents (via MCP) can edit videos, and show how to connect one. */
+function AgentsCard() {
+  const [st, setSt] = useState<Awaited<ReturnType<typeof window.ilf.agent.status>> | null>(null)
+  const [tab, setTab] = useState<'claude-code' | 'json'>('claude-code')
+  const [copied, setCopied] = useState(false)
+  const [busy, setBusy] = useState(false)
+  useEffect(() => {
+    window.ilf.agent.status().then(setSt)
+    const off = window.ilf.agent.onActivity(() => window.ilf.agent.status().then(setSt))
+    return () => {
+      off()
+    }
+  }, [])
+  const toggle = async (on: boolean) => {
+    setBusy(true)
+    setSt(await window.ilf.agent.setEnabled(on))
+    setBusy(false)
+  }
+  const l = st?.launch.app
+  const q = (x: string) => (/[\s"]/.test(x) ? JSON.stringify(x) : x)
+  const snippet = !l
+    ? ''
+    : tab === 'claude-code'
+      ? `claude mcp add iloveframes -- ${[l.command, ...l.args].map(q).join(' ')}`
+      : JSON.stringify({ mcpServers: { iloveframes: { command: l.command, args: l.args } } }, null, 2)
+  const copy = async () => {
+    await navigator.clipboard.writeText(snippet)
+    setCopied(true)
+    setTimeout(() => setCopied(false), 1500)
+  }
+  return (
+    <div className="rounded-[22px] border border-white/[0.07] bg-white/[0.02] p-5">
+      <div className="flex items-start justify-between gap-4">
+        <div className="flex gap-3">
+          <span className="grid h-9 w-9 shrink-0 place-items-center rounded-xl bg-white/[0.05] ring-1 ring-white/[0.06]"><Bot className="h-4 w-4 text-brand-lilac" /></span>
+          <div>
+            <div className="text-[13px] font-semibold text-white">AI agents</div>
+            <div className="mt-0.5 text-[12px] leading-snug text-zinc-500">Let Claude, Cursor or another AI agent edit your videos for you, through MCP.</div>
+          </div>
+        </div>
+        <Switch checked={!!st?.enabled} disabled={!st || busy} onCheckedChange={toggle} aria-label="Allow AI agents" />
+      </div>
+      {st?.enabled && (
+        <div className="mt-4 space-y-3">
+          <div className="flex items-center gap-2 text-[11.5px] text-zinc-400">
+            <span className="relative flex h-2 w-2"><span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-emerald-400/60" /><span className="relative inline-flex h-2 w-2 rounded-full bg-emerald-400" /></span>
+            {st.lastCall ? `Connected · last used ${ago(st.lastCall.at)}` : 'Ready · add iloveframes to your agent below'}
+          </div>
+          <div className="flex gap-1 rounded-lg bg-white/[0.04] p-0.5 text-[11.5px]">
+            {([['claude-code', 'Claude Code'], ['json', 'Claude Desktop / Cursor']] as const).map(([v, label]) => (
+              <button key={v} onClick={() => setTab(v)} className={cn('h-7 flex-1 rounded-md transition-colors', tab === v ? 'bg-white/[0.1] text-white' : 'text-zinc-400 hover:text-white')}>{label}</button>
+            ))}
+          </div>
+          <div className="relative">
+            <pre className="max-h-40 overflow-auto whitespace-pre-wrap break-all rounded-xl border border-white/[0.06] bg-black/40 p-3 pr-11 font-mono text-[11px] leading-relaxed text-zinc-300">{snippet}</pre>
+            <button onClick={copy} className="absolute right-2 top-2 grid h-7 w-7 place-items-center rounded-lg text-zinc-400 hover:bg-white/[0.08] hover:text-white" title="Copy">
+              {copied ? <Check className="h-3.5 w-3.5 text-emerald-400" /> : <Copy className="h-3.5 w-3.5" />}
+            </button>
+          </div>
+          <div className="text-[11px] leading-relaxed text-zinc-500">
+            {tab === 'claude-code' ? 'Run this once in a terminal.' : 'Add this to your agent’s MCP settings (claude_desktop_config.json, or Cursor → MCP).'} Keep iloveframes open while the agent works. Agents can only edit and export videos: they can’t see your license, settings or other files, and every change can be undone.
+          </div>
+        </div>
+      )}
     </div>
   )
 }

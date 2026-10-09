@@ -11,6 +11,7 @@ import { Titlebar, LogoMark, Wordmark } from './components/Brand'
 import { ChevronLeft } from 'lucide-react'
 import { ProCelebration, ProTag } from './components/Pro'
 import { FeedbackDialog } from './components/Feedback'
+import { startAgentListener } from './lib/agent'
 import { Tour } from './components/Tour'
 
 function useHashRoute() {
@@ -48,8 +49,20 @@ export default function App() {
       <Tour />
       <FeedbackDialog />
       <ProCelebration />
+      <AgentBridge />
     </TooltipProvider>
   )
+}
+
+/** Runs AI agent tool calls (only in the main window; see lib/agent.ts). */
+function AgentBridge() {
+  useEffect(() => {
+    const off = startAgentListener()
+    return () => {
+      off()
+    }
+  }, [])
+  return null
 }
 
 function AccountPage() {

@@ -13,6 +13,7 @@ import { defaultShot, drawShot, shotLayout, type ShotSettings } from '@/engine/s
 import { loadBgImage } from '@/engine/backgrounds'
 import { cn, modKey } from '@/lib/utils'
 import { uniqueName } from '@/lib/naming'
+import { track } from '@/lib/telemetry'
 import { navigate } from '@/App'
 
 type Img = HTMLImageElement
@@ -117,6 +118,7 @@ function CropView({ img, crop, ratio, onChange }: { img: Img; crop: ShotSettings
 }
 
 export default function Shot() {
+  useEffect(() => track('screenshot_studio'), [])
   const [img, setImg] = useState<Img | null>(null)
   const [name, setName] = useState('')
   const [s, setS] = useState<ShotSettings>(loadSettings)
@@ -214,6 +216,7 @@ export default function Shot() {
       if (!c) return
       const blob: Blob = await new Promise((r) => c.toBlob((b) => r(b!), s.format === 'png' ? 'image/png' : 'image/jpeg', 0.95))
       const out = await window.ilf.shot.save(await blob.arrayBuffer(), uniqueName(name ? name : 'Screenshot', 'file'), s.format)
+      if (out) track('screenshot_export', { format: s.format })
       if (out) flash('Saved ' + out.split(/[\\/]/).pop())
     } catch (e: any) {
       flash(e?.message?.replace(/^.*Error: /, '') ?? 'Export failed')
@@ -227,6 +230,7 @@ export default function Shot() {
       if (!c) return
       const blob: Blob = await new Promise((r) => c.toBlob((b) => r(b!), 'image/png'))
       await window.ilf.shot.copy(await blob.arrayBuffer())
+      track('screenshot_copy')
       flash('Copied to clipboard')
     } catch (e: any) {
       flash(e?.message?.replace(/^.*Error: /, '') ?? 'Copy failed')

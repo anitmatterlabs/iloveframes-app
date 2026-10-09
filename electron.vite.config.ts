@@ -3,7 +3,7 @@ import { defineConfig, externalizeDepsPlugin } from 'electron-vite'
 import react from '@vitejs/plugin-react'
 
 export default defineConfig({
-  main: { plugins: [externalizeDepsPlugin()], build: { minify: true } },
+  main: { plugins: [externalizeDepsPlugin()], build: { minify: true, rollupOptions: { input: { index: resolve('src/main/main.ts') }, output: { chunkFileNames: '[name]-[hash].js' } } } },
   preload: { plugins: [externalizeDepsPlugin()], build: { minify: true } },
   renderer: {
     resolve: { alias: { '@': resolve('src/renderer/src') } },

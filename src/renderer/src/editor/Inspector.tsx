@@ -9,7 +9,7 @@ import { GRADIENTS, SOLIDS, WALLPAPERS, backgroundThumb } from '@/engine/backgro
 import { STUDIO } from '@/engine/studio'
 import { autoZoomSegments } from '@/engine/motion'
 import { playSfx, keyVariant, CLICK_SOUNDS, ZOOM_SOUNDS, TYPING_SOUNDS } from '@/engine/sounds'
-import type { Aspect, CamPos, CursorStyle, EditState } from '@/engine/types'
+import type { Aspect, CamPos, CursorStyle, DeviceColor, DeviceKind, EditState } from '@/engine/types'
 import { LabeledSlider, Slider } from '@/components/ui/slider'
 import { SwitchRow } from '@/components/ui/switch'
 import { Segmented } from '@/components/ui/segmented'
@@ -21,6 +21,8 @@ import { MAIN, clipAt, cropOf, seqEvents, sourceInfo, toCrop, trackOf, type Sour
 import { TransitionIcon, TransitionPicker } from './Transitions'
 import { openCrop } from './CropEditor'
 import { offerTour, replayTour } from '@/components/Tour'
+import { DEVICE_FRAMES_ENABLED } from '@/engine/devices'
+import { trackOncePerSession } from '@/lib/telemetry'
 import { useSourceThumbs } from './Timeline'
 
 type Tab = 'clips' | 'background' | 'frame' | 'cursor' | 'zoom' | 'camera' | 'audio'
@@ -136,7 +138,10 @@ function BackgroundPanel({ edit }: { edit: EditState }) {
   return (
     <BackgroundPicker
       bg={edit.background}
-      onChange={(b, history = true) => updateEdit((e) => ({ ...e, background: b }), history)}
+      onChange={(b, history = true) => {
+        trackOncePerSession('bg:' + b.kind, 'background_changed', { kind: b.kind })
+        updateEdit((e) => ({ ...e, background: b }), history)
+      }}
       onCommit={() => useEditor.getState().checkpoint()}
     />
   )
@@ -268,10 +273,86 @@ function CropSection({ edit }: { edit: EditState }) {
   )
 }
 
+/** Tiny laptop drawings for the device picker. */
+function DeviceGlyph({ kind, color, on }: { kind: DeviceKind; color: DeviceColor; on: boolean }) {
+  const stroke = on ? '#e9d5ff' : '#71717a'
+  if (kind === 'none')
+    return (
+      <svg viewBox="0 0 44 28" className="h-7 w-11">
+        <rect x="6" y="4" width="32" height="20" rx="3.5" fill="none" stroke={stroke} strokeWidth="1.5" />
+      </svg>
+    )
+  const body = color === 'light' ? '#d4d4d8' : '#3f3f46'
+  const mac = kind === 'macbook'
+  return (
+    <svg viewBox="0 0 44 28" className="h-7 w-11">
+      <rect x="8" y="3" width="28" height="19" rx={mac ? 2.6 : 1.2} fill={body} stroke={stroke} strokeWidth="1.2" />
+      <rect x="9.6" y="4.6" width="24.8" height="15.2" rx={mac ? 1.2 : 0.4} fill="#0a0a0c" />
+      <circle cx="22" cy="3.9" r="0.45" fill="#52525b" />
+      {mac ? (
+        <path d="M3.5 22.2h37c0 1.4-1.3 2.3-3.2 2.3H6.7c-1.9 0-3.2-.9-3.2-2.3Z" fill={body} stroke={stroke} strokeWidth="1.1" />
+      ) : (
+        <>
+          <rect x="11" y="21.3" width="22" height="1.3" rx=".6" fill="#18181b" />
+          <rect x="6" y="22.2" width="32" height="2.4" rx=".7" fill={body} stroke={stroke} strokeWidth="1.1" />
+        </>
+      )}
+    </svg>
+  )
+}
+
+/** Put the recording on a laptop. */
+function DeviceSection({ edit }: { edit: EditState }) {
+  const d = edit.device ?? { kind: 'none' as DeviceKind, color: 'dark' as DeviceColor }
+  const setD = (patch: Partial<NonNullable<EditState['device']>>) => set((e) => ({ ...e, device: { ...d, ...e.device, ...patch } }))
+  return (
+    <Section title="Device" tour="frame-device">
+      <div className="grid grid-cols-3 gap-2">
+        {([
+          { v: 'none', label: 'None' },
+          { v: 'macbook', label: 'MacBook' },
+          { v: 'laptop', label: 'Windows laptop' }
+        ] as { v: DeviceKind; label: string }[]).map(({ v, label }) => (
+          <button
+            key={v}
+            onClick={() => setD({ kind: v })}
+            className={cn('flex h-[72px] flex-col items-center justify-center gap-1.5 rounded-xl border text-[11px] transition-all', d.kind === v ? 'border-brand-orchid/60 bg-brand-soft text-white' : 'border-white/[0.07] bg-white/[0.02] text-zinc-400 hover:border-white/15')}
+          >
+            <DeviceGlyph kind={v} color={d.color} on={d.kind === v} />
+            <span className="whitespace-nowrap">{label}</span>
+          </button>
+        ))}
+      </div>
+      {d.kind !== 'none' && (
+        <div className="flex items-center justify-between">
+          <span className="text-[12px] text-zinc-400">Finish</span>
+          <div className="flex gap-1 rounded-lg bg-white/[0.04] p-0.5">
+            {([
+              { v: 'dark', label: d.kind === 'macbook' ? 'Space black' : 'Graphite', sw: '#2a2b30' },
+              { v: 'light', label: d.kind === 'macbook' ? 'Silver' : 'Platinum', sw: '#d9dadf' }
+            ] as { v: DeviceColor; label: string; sw: string }[]).map(({ v, label, sw }) => (
+              <button
+                key={v}
+                onClick={() => setD({ color: v })}
+                className={cn('flex h-7 items-center gap-1.5 rounded-md px-2.5 text-[11.5px] transition-colors', d.color === v ? 'bg-white/[0.1] text-white' : 'text-zinc-400 hover:text-white')}
+              >
+                <span className="h-3 w-3 rounded-full ring-1 ring-white/25" style={{ background: sw }} />
+                {label}
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
+    </Section>
+  )
+}
+
 function FramePanel({ edit }: { edit: EditState }) {
+  const onDevice = DEVICE_FRAMES_ENABLED && !!edit.device && edit.device.kind !== 'none'
   return (
     <>
       <CropSection edit={edit} />
+      {DEVICE_FRAMES_ENABLED && <DeviceSection edit={edit} />}
       <Section title="Aspect ratio" tour="frame-aspect">
         <div className="grid grid-cols-3 gap-2">
           {(['16:9', '9:16', '1:1', '4:3', '4:5', 'auto'] as Aspect[]).map((a) => {
@@ -292,9 +373,15 @@ function FramePanel({ edit }: { edit: EditState }) {
       </Section>
       <Section title="Style" tour="frame-style">
         <LabeledSlider label="Padding" value={edit.padding} min={0} max={0.22} step={0.005} onChange={(v) => live((e) => ({ ...e, padding: v }))} format={(v) => Math.round((v / 0.22) * 100) + '%'} />
-        <LabeledSlider label="Corner radius" value={edit.radius} min={0} max={48} step={1} onChange={(v) => live((e) => ({ ...e, radius: v }))} format={(v) => v + 'px'} />
+        <div className={cn('space-y-4', onDevice && 'pointer-events-none opacity-40')}>
+          <LabeledSlider label="Corner radius" value={edit.radius} min={0} max={48} step={1} onChange={(v) => live((e) => ({ ...e, radius: v }))} format={(v) => v + 'px'} />
+        </div>
         <LabeledSlider label="Shadow" value={edit.shadow} min={0} max={1} step={0.01} onChange={(v) => live((e) => ({ ...e, shadow: v }))} format={(v) => Math.round(v * 100) + '%'} />
-        <SwitchRow label="Glass edge" hint="Subtle inner highlight around the frame" checked={edit.inset} onChange={(v) => set((e) => ({ ...e, inset: v }))} />
+        {onDevice ? (
+          <div className="text-[11px] leading-snug text-zinc-500">The laptop sets its own corners and glass. Padding and shadow still apply.</div>
+        ) : (
+          <SwitchRow label="Glass edge" hint="Subtle inner highlight around the frame" checked={edit.inset} onChange={(v) => set((e) => ({ ...e, inset: v }))} />
+        )}
       </Section>
     </>
   )

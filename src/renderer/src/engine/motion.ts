@@ -191,8 +191,10 @@ export class MotionTracks {
   private simulateCamera() {
     const dt = 1 / HZ
     const T = transitionFor(this.edit.zoom.speed)
-    const wcam = lerp(6.5, 2.8, clamp(this.edit.zoom.followSmoothness, 0, 1))
+    const wcam = lerp(7.5, 3.6, clamp(this.edit.zoom.followSmoothness, 0, 1))
     let active: ZoomSegment | null = null
+    this.clicks.sort((a, b) => a.t - b.t)
+    let ci = 0
     let gx = 0.5, gy = 0.5, pcx = 0.5, pcy = 0.5, pvx = 0, pvy = 0
     for (let i = 0; i < this.n; i++) {
       const t = i / HZ
@@ -221,14 +223,23 @@ export class MotionTracks {
       }
       if (seg.follow) {
         if (t >= seg.start + tr && t <= seg.end - tr) {
-          // dead-zone: only pan when the cursor nears the edge of the view
-          const m = hwF * 0.62
-          const sp = this.seqCursor(t)
+          // keep the cursor in the middle of the view: a small dead zone so tiny
+          // jitters don't move the camera, aimed slightly ahead so it never trails
+          const m = hwF * 0.2
+          const sp = this.seqCursor(t + 0.25)
           const cx = sp.x, cy = sp.y
           if (cx > gx + m) gx = cx - m
           if (cx < gx - m) gx = cx + m
           if (cy > gy + m) gy = cy - m
           if (cy < gy - m) gy = cy + m
+          // a click is a point of interest: centre it
+          while (ci < this.clicks.length && this.clicks[ci].t <= t) {
+            const c = this.clicks[ci++]
+            if (c.t >= seg.start) {
+              gx = c.x
+              gy = c.y
+            }
+          }
           gx = clamp(gx, hwF, 1 - hwF)
           gy = clamp(gy, hwF, 1 - hwF)
         }

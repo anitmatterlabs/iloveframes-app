@@ -15,6 +15,10 @@ export const CONFIG = {
   /** In-app feedback is posted here (the website worker forwards it to the inbox). */
   feedbackUrl: 'https://iloveframes.app/api/feedback',
 
+  /** Anonymous usage stats (Pulse): where batches go, and this app's id there. */
+  telemetryUrl: 'https://pulse.abhinayvundavilli007.workers.dev/a',
+  telemetryApp: '293a040b4d17',
+
   /** Free trial length from the very first launch. */
   trialMs: 24 * 60 * 60 * 1000,
   /** How long a license keeps working without reaching Dodo (offline grace). */

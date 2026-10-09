@@ -758,3 +758,200 @@ module.exports.crop = async (app, win, out) => {
   console.log('EXPORTED')
   await win.evaluate(() => ['home', 'editor', 'tab-clips', 'tab-background', 'tab-frame', 'tab-cursor', 'tab-zoom', 'tab-camera', 'tab-audio'].forEach((n) => localStorage.removeItem(`ilf.tour.${n}.v1`)))
 }
+// webcam bubble during playback and scrubbing: counts frames drawn with a live / held / missing webcam
+module.exports.camplay = async (app, win, out) => {
+  await win.evaluate(() => { ['home', 'editor'].forEach((n) => localStorage.setItem(`ilf.tour.${n}.v1`, 'done')); ['clips', 'background', 'frame', 'cursor', 'zoom', 'camera', 'audio'].forEach((t) => localStorage.setItem(`ilf.tour.tab-${t}.v1`, 'done')) })
+  await win.evaluate((id) => { location.hash = '/editor/' + encodeURIComponent(id) }, process.env.PID)
+  await win.waitForTimeout(4000)
+  const reset = () => win.evaluate(() => Object.assign(window.__ilfCamStats, { live: 0, held: 0, missing: 0 }))
+  const stats = () => win.evaluate(() => ({ ...window.__ilfCamStats }))
+  await win.evaluate(() => window.__ilfPlayer.seek(0))
+  await win.waitForTimeout(600)
+  await reset()
+  await win.evaluate(() => window.__ilfPlayer.play())
+  await win.waitForTimeout(4500)
+  await win.evaluate(() => window.__ilfPlayer.pause())
+  console.log('PLAY', JSON.stringify(await stats()))
+  await win.screenshot({ path: path.join(out, 'camplay.png') })
+  await reset()
+  for (const t of [3.9, 1.2, 4.6, 0.8, 2.7, 4.1, 1.9, 3.3, 0.9, 4.8, 2.2, 3.6]) {
+    await win.evaluate((t) => window.__ilfPlayer.seek(t), t)
+    await win.waitForTimeout(90)
+  }
+  await win.waitForTimeout(800)
+  console.log('SCRUB', JSON.stringify(await stats()))
+  // play across a scrub: seek while playing
+  await reset()
+  await win.evaluate(() => { window.__ilfPlayer.seek(0.6); window.__ilfPlayer.play() })
+  await win.waitForTimeout(1200)
+  await win.evaluate(() => window.__ilfPlayer.seek(3.2))
+  await win.waitForTimeout(1500)
+  await win.evaluate(() => window.__ilfPlayer.pause())
+  console.log('PLAYSEEK', JSON.stringify(await stats()))
+}
+// device frames: pick each laptop + finish from the Frame panel and screenshot the preview
+module.exports.devices = async (app, win, out) => {
+  await win.evaluate(() => { ['home', 'editor'].forEach((n) => localStorage.setItem(`ilf.tour.${n}.v1`, 'done')); ['clips', 'background', 'frame', 'cursor', 'zoom', 'camera', 'audio'].forEach((t) => localStorage.setItem(`ilf.tour.tab-${t}.v1`, 'done')) })
+  await win.evaluate((id) => { location.hash = '/editor/' + encodeURIComponent(id) }, process.env.PID)
+  await win.waitForTimeout(4000)
+  await win.evaluate(() => window.__ilfPlayer.seek(3))
+  await win.locator('[data-tab="frame"]').first().click()
+  await win.waitForTimeout(500)
+  const pick = async (label, finish, name) => {
+    await win.getByRole('button', { name: label, exact: true }).click()
+    if (finish) await win.getByRole('button', { name: finish }).click()
+    await win.waitForTimeout(700)
+    await win.locator('canvas').first().screenshot({ path: path.join(out, name + '.png') })
+  }
+  await pick('MacBook', 'Space black', 'dev-mac-dark')
+  await pick('MacBook', 'Silver', 'dev-mac-light')
+  await pick('Windows laptop', 'Graphite', 'dev-win-dark')
+  await pick('Windows laptop', 'Platinum', 'dev-win-light')
+  await win.screenshot({ path: path.join(out, 'dev-panel.png') })
+  await pick('None', null, 'dev-none')
+}
+
+// AI agent bridge end to end: enable it, start the MCP server like an agent would, call tools over stdio
+module.exports.agent = async (app, win, out) => {
+  const { spawn } = require('child_process')
+  const fs = require('fs')
+  const http = require('http')
+  await win.evaluate(() => { ['home', 'editor'].forEach((n) => localStorage.setItem(`ilf.tour.${n}.v1`, 'done')); ['clips', 'background', 'frame', 'cursor', 'zoom', 'camera', 'audio'].forEach((t) => localStorage.setItem(`ilf.tour.tab-${t}.v1`, 'done')) })
+  const st = await win.evaluate(() => window.ilf.agent.setEnabled(true))
+  console.log('ENABLED', st.enabled, 'port', st.port)
+  const launch = process.env.MCP_VIA === 'node' ? st.launch.node : st.launch.app
+  console.log('LAUNCH', JSON.stringify(launch))
+  const mcp = spawn(launch.command, launch.args, { stdio: ['pipe', 'pipe', 'pipe'] })
+  mcp.stderr.on('data', () => {})
+  let buf = ''
+  const waiting = new Map()
+  mcp.stdout.on('data', (d) => {
+    buf += d
+    let i
+    while ((i = buf.indexOf('\n')) >= 0) {
+      const line = buf.slice(0, i)
+      buf = buf.slice(i + 1)
+      try {
+        const m = JSON.parse(line)
+        const w = waiting.get(m.id)
+        if (w) w(m)
+      } catch { console.log('NONJSON-STDOUT', line.slice(0, 120)) }
+    }
+  })
+  let n = 0
+  const rpc = (method, params) => new Promise((resolve, reject) => {
+    const id = ++n
+    const t = setTimeout(() => reject(new Error('timeout ' + method)), 600000)
+    waiting.set(id, (m) => { clearTimeout(t); resolve(m) })
+    mcp.stdin.write(JSON.stringify({ jsonrpc: '2.0', id, method, params }) + '\n')
+  })
+  const call = async (name, args = {}) => {
+    const r = await rpc('tools/call', { name, arguments: args })
+    const c = r.result.content
+    const txt = c.filter((x) => x.type === 'text').map((x) => x.text).join(' ')
+    return { err: !!r.result.isError, txt, img: c.find((x) => x.type === 'image') }
+  }
+  const short = (s, k = 160) => s.replace(/\s+/g, ' ').slice(0, k)
+  const init = await rpc('initialize', { protocolVersion: '2025-06-18', capabilities: {}, clientInfo: { name: 'test', version: '1' } })
+  console.log('INIT', init.result.serverInfo.name, init.result.protocolVersion)
+  mcp.stdin.write(JSON.stringify({ jsonrpc: '2.0', method: 'notifications/initialized' }) + '\n')
+  const tl = await rpc('tools/list', {})
+  console.log('TOOLS', tl.result.tools.length, tl.result.tools.map((t) => t.name).join(','))
+  let r = await call('get_status'); console.log('get_status', r.err, short(r.txt))
+  r = await call('list_projects', { limit: 3 }); console.log('list_projects', r.err, short(r.txt, 200))
+  r = await call('get_project'); console.log('get_project(before open)', r.err, short(r.txt))
+  r = await call('open_project', { id: process.env.PID }); console.log('open_project', r.err, short(r.txt, 120))
+  const proj = JSON.parse((await call('get_project')).txt)
+  console.log('project', proj.seconds, 's clips', proj.clips.length, 'zooms', proj.zooms.length, 'clicks', proj.click_count)
+  r = await call('set_frame', { device: 'macbook', device_color: 'light', padding: 0.1 }); console.log('set_frame', r.err, r.txt)
+  r = await call('set_background', { kind: 'gradient', value: 'g-dusk' }); console.log('set_background', r.err, r.txt)
+  r = await call('set_background', { kind: 'solid', value: 'red' }); console.log('set_background(bad)', r.err, r.txt)
+  r = await call('remove_zoom', { all: true }); console.log('remove_zoom', r.err, r.txt)
+  r = await call('add_zoom', { start: 2, end: 6, scale: 2.2 }); console.log('add_zoom', r.err, r.txt)
+  r = await call('add_zoom', { start: 4, end: 7 }); console.log('add_zoom(overlap)', r.err, r.txt)
+  r = await call('add_zoom', { start: 1, end: 2, scale: 99 }); console.log('add_zoom(scale 99)', r.err, r.txt)
+  r = await call('remove_range', { start: 20, end: 24 }); console.log('remove_range', r.err, short(r.txt, 120))
+  r = await call('set_transition', { all: true, kind: 'blur', duration: 0.5 }); console.log('set_transition', r.err, r.txt)
+  r = await call('preview_frame', { time: 3 }); console.log('preview_frame', r.err, r.img ? r.img.mimeType + ' ' + r.img.data.length + ' b64 chars' : r.txt)
+  if (r.img) fs.writeFileSync(path.join(out, 'agent-frame.jpg'), Buffer.from(r.img.data, 'base64'))
+  const after = JSON.parse((await call('get_project')).txt)
+  console.log('after', after.seconds, 's clips', after.clips.length, 'zooms', JSON.stringify(after.zooms.map((z) => [z.start, z.end, z.scale])), 'frame', JSON.stringify(after.frame), 'bg', JSON.stringify(after.background))
+  r = await call('undo', { steps: 2 }); console.log('undo', r.err, r.txt)
+  r = await call('redo', { steps: 2 }); console.log('redo', r.err, r.txt)
+  r = await call('unlock_pro', {}); console.log('unknown tool via MCP', r.err, r.txt)
+  // straight at the bridge, bypassing the MCP server
+  const b = JSON.parse(fs.readFileSync(path.join(process.env.APPDATA, 'iloveframes', 'agent-bridge.json'), 'utf8'))
+  const post = (headers, body) => new Promise((res) => {
+    const req = http.request({ host: '127.0.0.1', port: b.port, path: '/call', method: 'POST', headers: { 'Content-Type': 'application/json', ...headers } }, (rs) => { let d = ''; rs.on('data', (c) => (d += c)); rs.on('end', () => res(rs.statusCode + ' ' + d)) })
+    req.end(JSON.stringify(body))
+  })
+  console.log('bridge no key', await post({}, { tool: 'get_status' }))
+  console.log('bridge wrong key', await post({ Authorization: 'Bearer ' + 'x'.repeat(64) }, { tool: 'get_status' }))
+  console.log('bridge from a web page', await post({ Authorization: 'Bearer ' + b.token, Origin: 'https://evil.example' }, { tool: 'get_status' }))
+  console.log('bridge license tool', await post({ Authorization: 'Bearer ' + b.token }, { tool: 'license:activate', args: { key: 'x' } }))
+  if (process.env.AGENT_EXPORT) {
+    const t0 = Date.now()
+    r = await call('export_video', { resolution: '720', fps: '30', quality: 'standard' })
+    console.log('export_video', r.err, short(r.txt), ((Date.now() - t0) / 1000).toFixed(1) + 's')
+  }
+  await win.screenshot({ path: path.join(out, 'agent-editor.png') })
+  mcp.stdin.end()
+  await win.evaluate(() => { location.hash = '/account' })
+  await win.waitForTimeout(1200)
+  await win.screenshot({ path: path.join(out, 'agent-account.png') })
+  const off = await win.evaluate(() => window.ilf.agent.setEnabled(false))
+  console.log('DISABLED', !off.enabled, 'bridge file gone', !fs.existsSync(path.join(process.env.APPDATA, 'iloveframes', 'agent-bridge.json')))
+}
+
+// device frame inside the app: zoomed + unzoomed preview, then a real MP4 export with the MacBook frame
+module.exports.devexport = async (app, win, out) => {
+  await win.evaluate(() => { ['home', 'editor'].forEach((n) => localStorage.setItem(`ilf.tour.${n}.v1`, 'done')); ['clips', 'background', 'frame', 'cursor', 'zoom', 'camera', 'audio'].forEach((t) => localStorage.setItem(`ilf.tour.tab-${t}.v1`, 'done')) })
+  await win.evaluate((id) => { location.hash = '/editor/' + encodeURIComponent(id) }, process.env.PID)
+  await win.waitForTimeout(4000)
+  await win.locator('[data-tab="frame"]').first().click()
+  await win.waitForTimeout(400)
+  await win.getByRole('button', { name: 'MacBook', exact: true }).click()
+  await win.getByRole('button', { name: 'Silver' }).click()
+  for (const [t, n] of [[0.5, 'app-mac-wide'], [4, 'app-mac-zoom']]) {
+    await win.evaluate((t) => window.__ilfPlayer.seek(t), t)
+    await win.waitForTimeout(900)
+    await win.locator('canvas').first().screenshot({ path: path.join(out, n + '.png') })
+  }
+  await win.getByRole('button', { name: 'Windows laptop', exact: true }).click()
+  await win.getByRole('button', { name: 'Graphite' }).click()
+  await win.waitForTimeout(700)
+  await win.locator('canvas').first().screenshot({ path: path.join(out, 'app-win.png') })
+  await win.getByRole('button', { name: 'MacBook', exact: true }).click()
+  await win.getByRole('button', { name: 'Export' }).first().click()
+  await win.waitForTimeout(500)
+  await win.getByRole('button', { name: /Export MP4/ }).click()
+  await win.getByText('Your video is ready').waitFor({ timeout: 300000 })
+  console.log('EXPORTED')
+  // leave the test project as it was
+  await win.keyboard.press('Escape').catch(() => {})
+}
+
+// Frame panel without the parked Device picker
+module.exports.framepanel = async (app, win, out) => {
+  await win.evaluate(() => { ['home', 'editor'].forEach((n) => localStorage.setItem(`ilf.tour.${n}.v1`, 'done')); ['clips', 'background', 'frame', 'cursor', 'zoom', 'camera', 'audio'].forEach((t) => localStorage.setItem(`ilf.tour.tab-${t}.v1`, 'done')) })
+  await win.evaluate((id) => { location.hash = '/editor/' + encodeURIComponent(id) }, process.env.PID)
+  await win.waitForTimeout(4000)
+  await win.locator('[data-tab="frame"]').first().click()
+  await win.waitForTimeout(600)
+  console.log('DEVICE SECTION VISIBLE', await win.getByText('Device', { exact: true }).count())
+  await win.screenshot({ path: path.join(out, 'framepanel.png') })
+}
+
+// anonymous usage stats: open a project + screenshot studio, let the app send its batch
+module.exports.telemetry = async (app, win, out) => {
+  await win.evaluate(() => { ['home', 'editor'].forEach((n) => localStorage.setItem(`ilf.tour.${n}.v1`, 'done')); ['clips', 'background', 'frame', 'cursor', 'zoom', 'camera', 'audio'].forEach((t) => localStorage.setItem(`ilf.tour.tab-${t}.v1`, 'done')) })
+  console.log('opt-in state:', JSON.stringify(await win.evaluate(() => window.ilf.telemetry.get())))
+  await win.evaluate((id) => { location.hash = '/editor/' + encodeURIComponent(id) }, process.env.PID)
+  await win.waitForTimeout(4000)
+  await win.evaluate(() => { location.hash = '/shot' })
+  await win.waitForTimeout(2000)
+  await win.evaluate(() => { location.hash = '/account' })
+  await win.waitForTimeout(1500)
+  await win.screenshot({ path: path.join(out, 'telemetry-account.png') })
+  await win.waitForTimeout(3000) // first batch goes out ~4s after launch in this mode
+}

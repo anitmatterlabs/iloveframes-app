@@ -18,9 +18,14 @@ export const player = {
   toggle: () => {},
   redraw: () => {},
   restartClips: () => {},
-  fullscreen: () => {}
+  fullscreen: () => {},
+  /** render the edited video at t and return it as a JPEG data URL (for AI agents) */
+  snapshot: async (_t: number): Promise<string | null> => null
 }
 ;(window as any).__ilfPlayer = player // test harness hook
+/** How each drawn frame got its webcam picture (test harness hook). */
+const camStats = { live: 0, held: 0, missing: 0 }
+;(window as any).__ilfCamStats = camStats
 
 /** The frame a held side of a transition shows: last frame of the outgoing clip, first of the incoming. */
 const holdTimeA = (out: number) => Math.max(0, out - 1 / 60)
@@ -64,6 +69,7 @@ export function Preview() {
         c.muted = true
         c.playsInline = true
         c.addEventListener('seeked', () => (dirty.current = true))
+        c.addEventListener('loadeddata', () => (dirty.current = true))
         cams.current.set(id, c)
       }
       if (videos.current.has(id)) continue
@@ -209,6 +215,38 @@ export function Preview() {
 
     const pauseAllExcept = (keep: string | null) => videos.current.forEach((v, id) => id !== keep && !v.paused && v.pause())
 
+    /**
+     * Keep a follower (webcam / mic) in step with the playing source. Seeking a
+     * video is slow (it decodes from the previous keyframe), so while playing we
+     * steer small drift with a gentle speed change and only jump when far off;
+     * re-seeking on every small drift used to keep the webcam permanently
+     * mid-seek, so it vanished for seconds.
+     */
+    // how long a seek takes on each follower, learned as we go (long-GOP files can take seconds)
+    const seekCost = new WeakMap<HTMLMediaElement, number>()
+    const seekTo = (m: HTMLMediaElement, at: number) => {
+      const t0 = performance.now()
+      m.addEventListener('seeked', () => seekCost.set(m, Math.min(3, (performance.now() - t0) / 1000)), { once: true })
+      m.currentTime = at
+    }
+    const follow = (m: HTMLMediaElement, target: number, force: boolean) => {
+      const at = Math.max(0, target)
+      if (force || !playing) {
+        m.playbackRate = 1
+        if (Math.abs(m.currentTime - at) > 0.03) seekTo(m, at + (playing ? seekCost.get(m) ?? 0 : 0))
+        return
+      }
+      if (m.seeking) return
+      const drift = at - m.currentTime
+      if (drift > 3 || drift < -0.6) {
+        // far off: jump, landing ahead by what a seek costs here so we don't land behind again
+        m.playbackRate = 1
+        seekTo(m, at + (drift > 0 ? seekCost.get(m) ?? 0.15 : 0))
+      } else if (drift > 0.04) m.playbackRate = Math.min(3, 1 + drift * 1.5) // behind: catch up by playing faster
+      else if (drift < -0.04) m.playbackRate = Math.max(0.75, 1 + drift) // ahead: ease off
+      else if (m.playbackRate !== 1) m.playbackRate = 1
+    }
+
     /** Keep the webcam (of whichever source is playing) and the mic in step. */
     const syncAux = (source: string | null, srcT: number, force = false) => {
       const p = live.current.project
@@ -217,14 +255,35 @@ export function Preview() {
       const cam = source ? cams.current.get(source) : undefined
       if (cam && camInfo) {
         const ct = srcT - camInfo.offset
-        if (force || Math.abs(cam.currentTime - ct) > 0.12) cam.currentTime = Math.max(0, ct)
+        follow(cam, ct, force)
         if (playing && cam.paused && ct >= 0) cam.play().catch(() => {})
       }
       if (mic && p.mic && source === MAIN) {
         const mt = srcT - p.mic.offset
-        if (force || Math.abs(mic.currentTime - mt) > 0.12) mic.currentTime = Math.max(0, mt)
+        follow(mic, mt, force)
         if (playing && mic.paused && mt >= 0) mic.play().catch(() => {})
       } else if (mic && !mic.paused) mic.pause()
+    }
+
+    // last good webcam frame per source: shown while the webcam seeks or buffers, so it never blinks out
+    const camHeld = new Map<string, { canvas: HTMLCanvasElement; t: number }>()
+    const camFrame = (source: string, cam: HTMLVideoElement): CanvasImageSource | null => {
+      const ready = cam.readyState >= 2 && !cam.seeking && cam.videoWidth > 0
+      let h = camHeld.get(source)
+      if (ready) {
+        if (!h) {
+          h = { canvas: document.createElement('canvas'), t: -1 }
+          camHeld.set(source, h)
+        }
+        if (h.t !== cam.currentTime || h.canvas.width !== cam.videoWidth) {
+          if (h.canvas.width !== cam.videoWidth) h.canvas.width = cam.videoWidth
+          if (h.canvas.height !== cam.videoHeight) h.canvas.height = cam.videoHeight
+          h.canvas.getContext('2d')!.drawImage(cam, 0, 0)
+          h.t = cam.currentTime
+        }
+        return cam
+      }
+      return h && h.t >= 0 ? h.canvas : null
     }
 
     /** Point the right source video at sequence time T. */
@@ -308,6 +367,28 @@ export function Preview() {
     }
     player.toggle = () => (playing ? player.pause() : player.play())
     player.redraw = () => (dirty.current = true)
+    player.snapshot = async (t: number) => {
+      player.pause()
+      player.seek(t)
+      const settled = () => {
+        const hit = clipAt(live.current.edit.clips, T)
+        const v = hit ? vid(hit.clip.source) : null
+        const cam = hit ? cams.current.get(hit.clip.source) : null
+        return !!v && !v.seeking && v.readyState >= 2 && (!cam || !cam.seeking) && !holdBusy && !holdQueue.length
+      }
+      const until = Date.now() + 5000
+      while (!settled() && Date.now() < until) await new Promise((r) => setTimeout(r, 50))
+      dirty.current = true
+      await new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r)))
+      const c = canvasRef.current
+      if (!c) return null
+      const s = Math.min(1, 1280 / c.width)
+      const out = document.createElement('canvas')
+      out.width = Math.round(c.width * s)
+      out.height = Math.round(c.height * s)
+      out.getContext('2d')!.drawImage(c, 0, 0, out.width, out.height)
+      return out.toDataURL('image/jpeg', 0.85)
+    }
     cue(T, true)
 
     let raf = 0
@@ -352,7 +433,7 @@ export function Preview() {
           if (e.sfx.zoom.enabled) for (const c of zoomCues(e)) if (c.t > from && c.t <= T) playSfx(e.sfx.zoom.id, e.sfx.zoom.volume, 0, c.reversed)
         }
         lastT = T
-        if (++frame % 15 === 0) syncAux(hit.clip.source, hit.srcT)
+        if (++frame % 8 === 0) syncAux(hit.clip.source, hit.srcT)
         useEditor.getState().setTime(T)
       }
       if (!playing && !dirty.current) return
@@ -363,14 +444,21 @@ export function Preview() {
       if (mic) mic.volume = e.audio.muted ? 0 : Math.min(1, e.audio.micVolume)
       const camInfo = cameraOf(p, hit.clip.source)
       const cam = cams.current.get(hit.clip.source)
+      const camImg = cam ? camFrame(hit.clip.source, cam) : null
       const liveSrc: FrameSources = {
         screen: v.readyState >= 2 ? v : null,
         screenW: v.videoWidth,
         screenH: v.videoHeight,
         crop: cropOf(e.crops, hit.clip.source),
-        cam: e.camera.enabled && cam && cam.readyState >= 2 && camInfo && hit.srcT >= camInfo.offset ? cam : null,
+        cam: e.camera.enabled && camImg && camInfo && hit.srcT >= camInfo.offset ? camImg : null,
         camW: cam?.videoWidth ?? 0,
         camH: cam?.videoHeight ?? 0
+      }
+      // the webcam is still seeking: keep drawing until its fresh frame arrives
+      if (cam && cam.seeking) dirty.current = true
+      if (cam && camInfo && e.camera.enabled && hit.srcT >= camInfo.offset + 0.1) {
+        const k = camImg === cam ? 'live' : camImg ? 'held' : 'missing'
+        camStats[k]++
       }
       const trn = transitionAt(e.clips, T)
       if (trn) {

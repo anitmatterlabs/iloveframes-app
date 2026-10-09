@@ -2,6 +2,7 @@ import { create } from 'zustand'
 import type { EditState, MediaSource, Project, Transition, ZoomSegment } from '@/engine/types'
 import { clipLen, rippleInsert, rippleRemove, seqDuration, seqStarts, splitClips } from '@/engine/sequence'
 import { uid } from '@/engine/types'
+import { track, trackOncePerSession } from '@/lib/telemetry'
 import { autoZoomSegments } from '@/engine/motion'
 
 interface EditorState {
@@ -94,6 +95,7 @@ export function addSegmentAt(t: number, len = 3) {
   }
   if (end - start < 0.8) return
   const seg: ZoomSegment = { id: uid(), start, end, scale: 2, follow: true, x: 0.5, y: 0.5 }
+  track('zoom_added')
   updateEdit((e) => ({ ...e, zoom: { ...e.zoom, segments: [...e.zoom.segments, seg].sort((a, b) => a.start - b.start) } }))
   useEditor.getState().select(seg.id)
 }
@@ -161,6 +163,7 @@ export function addClipAt(sound: { name: string; file: string; duration: number 
   if (!project || !edit) return
   const total = seqDuration(edit.clips)
   const start = Math.max(0, Math.min(t, total - 0.2))
+  track('audio_added')
   const clip: Clip = { id: uid(), name: sound.name, src, start, offset: 0, duration: Math.min(sound.duration, Math.max(0.2, total - start)), sourceDuration: sound.duration, volume: 1 }
   updateEdit((e) => ({ ...e, audio: { ...e.audio, clips: [...e.audio.clips, clip] } }))
   useEditor.getState().select(clip.id)
@@ -181,6 +184,7 @@ export function splitAtPlayhead() {
   if (!edit) return false
   const next = splitClips(edit.clips, time)
   if (next === edit.clips) return false
+  track('clip_split')
   updateEdit((e) => ({ ...e, clips: next }))
   return true
 }
@@ -235,6 +239,7 @@ export function moveSeqClip(id: string, toIndex: number) {
  */
 export function appendSources(sources: MediaSource[]) {
   if (!sources.length) return
+  track('clip_imported', { n: sources.length, recordings: sources.filter((s) => s.track).length })
   useEditor.getState().setProject((p) => ({ ...p, sources: [...(p.sources ?? []), ...sources] }))
   const project = useEditor.getState().project!
   updateEdit((e) => {
@@ -257,10 +262,12 @@ export const DEFAULT_TRANSITION: Transition = { kind: 'fade', duration: 0.6 }
 
 /** Set (or clear with null) the transition into a clip. */
 export function setTransition(clipId: string, t: Transition | null) {
+  if (t) track('transition_set', { kind: t.kind })
   updateEdit((e) => ({ ...e, clips: e.clips.map((c) => (c.id === clipId ? { ...c, tIn: t ?? undefined } : c)) }))
 }
 
 /** Same transition on every cut. */
 export function setAllTransitions(t: Transition | null) {
+  if (t) track('transition_set', { kind: t.kind, all: true })
   updateEdit((e) => ({ ...e, clips: e.clips.map((c, i) => (i === 0 ? c : { ...c, tIn: t ?? undefined })) }))
 }

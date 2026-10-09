@@ -6,6 +6,7 @@ import { Button } from '@/components/ui/button'
 import { cn } from '@/lib/utils'
 import { updateEdit, useEditor } from './store'
 import { FULL, clipAt, cropOf, sourceInfo } from '@/engine/sequence'
+import { track, trackOncePerSession } from '@/lib/telemetry'
 import type { CropRect, EditState } from '@/engine/types'
 
 /**
@@ -208,6 +209,7 @@ export function CropEditor() {
   }
 
   const apply = (r: CropRect) => {
+    track('crop_applied')
     if (!source || !edit) return
     const prev = cropOf(edit.crops, source)
     updateEdit((e) => {

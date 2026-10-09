@@ -17,6 +17,7 @@ import { AccountBadge } from '@/components/Account'
 import { AccountOrb, HelpMenu } from '@/components/Pro'
 import { CropEditor, openCrop } from '@/editor/CropEditor'
 import { useFirstRunTour } from '@/components/Tour'
+import { track, trackOncePerSession } from '@/lib/telemetry'
 import { navigate } from '@/App'
 
 function ToolBtn({ tip, onClick, disabled, children, active }: { tip: string; onClick: () => void; disabled?: boolean; children: React.ReactNode; active?: boolean }) {
@@ -147,6 +148,12 @@ export default function Editor({ id }: { id: string }) {
     toastTimer.current = setTimeout(() => setToast(null), 1800)
   })
   const flash = flashRef.current
+  // changes made by an AI agent show up as a short note
+  useEffect(() => {
+    const on = (e: Event) => flash((e as CustomEvent<string>).detail)
+    window.addEventListener('ilf:toast', on)
+    return () => window.removeEventListener('ilf:toast', on)
+  }, [flash])
 
   useEffect(() => {
     let dead = false
@@ -160,6 +167,7 @@ export default function Editor({ id }: { id: string }) {
         loadedId.current = p.id
         setName(p.name)
         useEditor.getState().load(p, e)
+        track('project_opened', { fresh, clips: e.clips.length, camera: !!p.camera, mic: !!p.mic, len: Math.round(p.duration), imported: !p.recId })
       })
       .catch((err) => setError(String(err?.message ?? err)))
     return () => {

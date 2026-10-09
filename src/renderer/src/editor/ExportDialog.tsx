@@ -9,6 +9,7 @@ import { cropOf, seqDuration, sourceInfo } from '@/engine/sequence'
 import { playSfx } from '@/engine/sounds'
 import { Button } from '@/components/ui/button'
 import { Segmented } from '@/components/ui/segmented'
+import { track, trackOncePerSession } from '@/lib/telemetry'
 import { cn, fmtTime } from '@/lib/utils'
 
 type Phase = { kind: 'setup' } | { kind: 'running'; p: number; stage: string; startedAt: number } | { kind: 'done'; path: string; ms: number } | { kind: 'error'; message: string }
@@ -120,6 +121,8 @@ export function ExportDialog({ open, onClose }: { open: boolean; onClose: () => 
     signal.current = { cancelled: false }
     const startedAt = Date.now()
     setPhase({ kind: 'running', p: 0, stage: 'Preparing', startedAt })
+    const info = { format, res: Number(res), fps: Number(fps), quality, len: Math.round(len), clips: edit.clips.length, bg: edit.background.kind, camera: edit.camera.enabled, zooms: edit.zoom.segments.length }
+    track('export_started', info)
     try {
       const out = await exportProject(
         project,
@@ -129,10 +132,16 @@ export function ExportDialog({ open, onClose }: { open: boolean; onClose: () => 
         signal.current
       )
       playSfx('done', 0.7)
+      track('export_finished', { ...info, ms: Date.now() - startedAt })
       setPhase({ kind: 'done', path: out, ms: Date.now() - startedAt })
     } catch (e: any) {
-      if (signal.current.cancelled) setPhase({ kind: 'setup' })
-      else setPhase({ kind: 'error', message: e?.message ?? String(e) })
+      if (signal.current.cancelled) {
+        track('export_cancelled', { ...info, ms: Date.now() - startedAt })
+        setPhase({ kind: 'setup' })
+      } else {
+        track('export_failed', { ...info, msg: String(e?.message ?? e).slice(0, 120) })
+        setPhase({ kind: 'error', message: e?.message ?? String(e) })
+      }
     } finally {
       useEditor.setState({ exporting: false })
     }

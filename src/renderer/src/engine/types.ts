@@ -16,6 +16,8 @@ export type BackgroundKind = 'wallpaper' | 'gradient' | 'solid' | 'image'
 export type Aspect = 'auto' | '16:9' | '9:16' | '1:1' | '4:3' | '4:5'
 export type CursorStyle = 'auto' | 'mac' | 'light' | 'dot' | 'ring'
 export type CamPos = 'br' | 'bl' | 'tr' | 'tl'
+export type DeviceKind = 'none' | 'macbook' | 'laptop'
+export type DeviceColor = 'dark' | 'light'
 
 export interface SfxSetting {
   enabled: boolean
@@ -84,6 +86,8 @@ export interface EditState {
   radius: number
   shadow: number
   inset: boolean
+  /** show the recording on a laptop (no logos) */
+  device?: { kind: DeviceKind; color: DeviceColor }
   aspect: Aspect
   cursor: {
     enabled: boolean
@@ -181,6 +185,7 @@ export function defaultEdit(p: Pick<Project, 'cursorBaked' | 'camera' | 'duratio
     radius: 18,
     shadow: 0.7,
     inset: true,
+    device: { kind: 'none', color: 'dark' },
     aspect: '16:9',
     cursor: {
       enabled: !p.cursorBaked,
@@ -221,6 +226,7 @@ export function migrateEdit(p: Project, e: any): EditState {
     cursor: { ...d.cursor, ...old.cursor, style: old.cursor?.style === 'dot' ? 'auto' : old.cursor?.style ?? d.cursor.style, hidden: old.cursor?.hidden ?? [] },
     zoom: { ...d.zoom, ...old.zoom },
     camera: { ...d.camera, ...old.camera },
+    device: { ...d.device!, ...old.device },
     audio: { ...d.audio, ...old.audio, clips: old.audio?.clips ?? [] },
     clips: old.clips?.length ? old.clips : [{ id: 'c-main', source: 'main', in: old.trim?.start ?? 0, out: old.trim?.end ?? p.duration }],
     crops: old.crops ?? {},
