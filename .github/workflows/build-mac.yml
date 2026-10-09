@@ -3,9 +3,7 @@
 name: Build macOS
 
 on:
-  workflow_dispatch:
-  push:
-    tags: ['v*']
+  workflow_dispatch: # run from Actions when cutting a release (keeps Mac minutes for real builds)
 
 jobs:
   mac:

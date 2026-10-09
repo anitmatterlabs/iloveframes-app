@@ -1,11 +1,9 @@
 # Builds the Windows installer (.exe, NSIS) and the portable .exe.
-# Runs on every version tag and on demand (Actions → Build Windows → Run workflow).
+# Run on demand: Actions → Build Windows → Run workflow.
 name: Build Windows
 
 on:
-  workflow_dispatch:
-  push:
-    tags: ['v*']
+  workflow_dispatch: # run from Actions when cutting a release (keeps Mac minutes for real builds)
 
 jobs:
   windows:
