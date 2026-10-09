@@ -33,7 +33,7 @@ export const TOURS: Record<TourName, Step[]> = {
   editor: [
     { target: 'preview', title: 'Your video, already polished', body: 'This is exactly what you’ll export: zooms, cursor, background and all. Click it to play or pause.' },
     { target: 'transport', title: 'Play and navigate', body: <><kbd className="tour-kbd">Space</kbd> plays. <kbd className="tour-kbd">←</kbd> <kbd className="tour-kbd">→</kbd> step a frame, add <kbd className="tour-kbd">Shift</kbd> to jump a second.</> },
-    { target: 'tools', title: 'Quick tools', body: <>Split at the playhead <kbd className="tour-kbd">S</kbd>, delete a clip, add a zoom <kbd className="tour-kbd">Z</kbd>, hide the cursor, import a clip, or preview full screen <kbd className="tour-kbd">F</kbd>.</> },
+    { target: 'tools', title: 'Quick tools', body: <>Split at the playhead <kbd className="tour-kbd">S</kbd>, delete a clip, add a zoom <kbd className="tour-kbd">Z</kbd>, hide the cursor, import a clip, crop <kbd className="tour-kbd">C</kbd>, or preview full screen <kbd className="tour-kbd">F</kbd>.</> },
     { target: 'lane-clips', title: 'Clips', body: 'Drag a clip to reorder it, drag its edges to trim. The round button between two clips adds a transition.' },
     { target: 'lane-zoom', title: 'Zooms', body: 'Each purple block is a zoom. Drag to move, pull the edges to stretch, double-click empty space to add one.' },
     { target: 'lane-hide', title: 'Cursor', body: 'Double-click this lane to hide the cursor for a stretch, like while you type a password.' },
@@ -58,6 +58,7 @@ export const TOURS: Record<TourName, Step[]> = {
     { target: 'bg-library', title: 'Use your own', body: 'Add any photo as a background. Pick it and a blur slider appears to soften it.' }
   ],
   'tab-frame': [
+    { target: 'frame-crop', title: 'Crop', body: 'Trim the edges of a recording. Nothing is lost: the file and its smart data stay intact.' },
     { target: 'frame-aspect', title: 'Fit the platform', body: '16:9 for YouTube, 9:16 for Reels and Shorts, 1:1 or 4:5 for feeds.' },
     { target: 'frame-style', title: 'Give it depth', body: 'Padding, rounded corners and a soft shadow make your screen feel like a product shot.' }
   ],

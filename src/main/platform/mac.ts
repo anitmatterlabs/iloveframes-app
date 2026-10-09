@@ -4,7 +4,7 @@ import { join, dirname } from 'path'
 import { homedir, tmpdir } from 'os'
 import { promises as fsp } from 'fs'
 import type { Platform } from './types'
-import { avfoundationScreens, hasEncoder } from '../ffmpeg'
+import { avfoundationScreens, cropFilter, hasEncoder } from '../ffmpeg'
 
 const run = (cmd: string, args: string[]) => new Promise<string>((resolve) => execFile(cmd, args, (_e, out) => resolve(String(out ?? ''))))
 
@@ -14,8 +14,9 @@ export const mac: Platform = {
   id: 'mac',
   stopShortcutLabel: '⌘ + Shift + 2',
 
-  async captureAttempts(_display, idx, out, fps) {
-    const even = 'scale=trunc(iw/2)*2:trunc(ih/2)*2'
+  async captureAttempts(_display, idx, out, fps, crop) {
+    // an optional area crop runs first, then the frame is kept to even dimensions
+    const even = (crop ? cropFilter(crop) + ',' : '') + 'scale=trunc(iw/2)*2:trunc(ih/2)*2'
     const common = ['-g', String(fps), '-stats_period', '0.05', '-movflags', '+faststart']
     const screens = await avfoundationScreens()
     const dev = screens[idx] ?? screens[0]

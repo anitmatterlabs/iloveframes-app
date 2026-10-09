@@ -313,7 +313,7 @@ export function loadUserSound(src: string): Promise<AudioBuffer | null> {
 export async function renderAudioMix(project: Project, edit: EditState, micBuffer: AudioBuffer | null, sourceAudio: Map<string, AudioBuffer> = new Map()): Promise<AudioBuffer | null> {
   const dur = Math.max(0.1, seqDuration(edit.clips))
   const sfx = edit.sfx
-  const ev = seqEvents(project, edit.clips)
+  const ev = seqEvents(project, edit.clips, edit.crops)
   const hasClicks = edit.cursor.enabled && sfx.click.enabled && ev.clicks.length > 0
   const hasZoom = sfx.zoom.enabled && edit.zoom.segments.length > 0
   const hasKeys = sfx.typing.enabled && ev.keys.length > 0

@@ -7,6 +7,8 @@ export interface RecordOptions {
   countdown: number
   mode: 'auto' | 'manual'
   fps: number
+  /** area of the display to record (DIPs, relative to the display), or null for the full screen */
+  area?: { x: number; y: number; w: number; h: number } | null
 }
 
 interface Active {
@@ -59,7 +61,7 @@ export async function startRecording(o: RecordOptions) {
   if (o.countdown > 0) {
     // countdown ticks are played by the countdown overlay
   } else playSfx('start', 0.8)
-  const res = await window.ilf.rec.prepare({ displayId: o.displayId, countdown: o.countdown, mode: o.mode, fps: o.fps })
+  const res = await window.ilf.rec.prepare({ displayId: o.displayId, countdown: o.countdown, mode: o.mode, fps: o.fps, area: o.area ?? null })
   const recorders: Active['recorders'] = []
   if (res.engine === 'browser' && res.sourceId) {
     const scr = await navigator.mediaDevices.getUserMedia({

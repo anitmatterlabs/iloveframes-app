@@ -5,7 +5,7 @@ import { useEditor } from './store'
 import { player } from './Preview'
 import { exportProject, type ExportOptions } from '@/engine/exporter'
 import { outputSize } from '@/engine/compositor'
-import { seqDuration, sourceInfo } from '@/engine/sequence'
+import { cropOf, seqDuration, sourceInfo } from '@/engine/sequence'
 import { playSfx } from '@/engine/sounds'
 import { Button } from '@/components/ui/button'
 import { Segmented } from '@/components/ui/segmented'
@@ -105,8 +105,9 @@ export function ExportDialog({ open, onClose }: { open: boolean; onClose: () => 
 
   // the output takes its shape from the first clip, exactly like the exporter
   const first = sourceInfo(project, edit.clips[0]?.source ?? 'main')
-  const screenW = first?.width || project.display.width * project.display.scaleFactor
-  const screenH = first?.height || project.display.height * project.display.scaleFactor
+  const fc = cropOf(edit.crops, edit.clips[0]?.source ?? 'main')
+  const screenW = (first?.width || project.display.width * project.display.scaleFactor) * fc.w
+  const screenH = (first?.height || project.display.height * project.display.scaleFactor) * fc.h
   const [W, H] = outputSize(edit.aspect, screenW, screenH, Number(format === 'gif' ? Math.min(Number(res), 1080) : res))
   const len = seqDuration(edit.clips)
 

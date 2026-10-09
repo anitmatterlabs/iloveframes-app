@@ -1,4 +1,5 @@
 import type { Display } from 'electron'
+import type { CropFrac } from '../ffmpeg'
 
 /**
  * Everything that differs between Windows and macOS lives behind this
@@ -7,8 +8,8 @@ import type { Display } from 'electron'
  */
 export interface Platform {
   id: 'win' | 'mac'
-  /** ffmpeg argument sets to try in order for cursor-free screen capture. */
-  captureAttempts(display: Display, outputIndex: number, outFile: string, fps: number): Promise<string[][]>
+  /** ffmpeg argument sets to try in order for cursor-free screen capture (optionally only an area of it). */
+  captureAttempts(display: Display, outputIndex: number, outFile: string, fps: number, crop?: CropFrac): Promise<string[][]>
   /** Helper process that prints the OS cursor shape (arrow|hand|text) on change. */
   cursorWatcher(nativeDir: string): { cmd: string; args: string[] } | null
   /** Stable hardware/OS install identifier used to bind licence + trial data to this machine. */

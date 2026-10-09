@@ -77,9 +77,14 @@ const api = {
     remove: (id: string) => ipcRenderer.invoke('sounds:remove', id)
   },
   feedback: (f: { kind: string; message: string; email: string; name: string }): Promise<{ ok: true } | { ok: false; error: string }> => ipcRenderer.invoke('feedback:send', f),
+  area: {
+    /** open the area picker on a display; resolves to the area (DIPs, relative to the display) or null */
+    pick: (displayId: string, current?: { x: number; y: number; w: number; h: number } | null): Promise<{ x: number; y: number; w: number; h: number; W: number; H: number } | null> => ipcRenderer.invoke('area:pick', displayId, current),
+    done: (area: { x: number; y: number; w: number; h: number } | null) => ipcRenderer.send('area:done', area)
+  },
   pathForFile: (f: File) => webUtils.getPathForFile(f),
   wallpapers: {
-    list: (): Promise<{ id: string; name: string; group: string; file: string; thumb: string; width: number; height: number }[]> => ipcRenderer.invoke('wallpapers:list'),
+    list: (): Promise<{ id: string; name: string; group: string; file: string; thumb: string; width: number; height: number; url?: string; thumbUrl?: string }[]> => ipcRenderer.invoke('wallpapers:list'),
     import: (group?: string, paths?: string[], names?: Record<string, string>) => ipcRenderer.invoke('wallpapers:import', group, paths, names),
     remove: (id: string) => ipcRenderer.invoke('wallpapers:remove', id)
   }

@@ -1,9 +1,14 @@
 import { useEffect, useState } from 'react'
 import { motion } from 'framer-motion'
 import { Square, X } from 'lucide-react'
-import { fmtTime } from '@/lib/utils'
+import { fmtTime, modKey } from '@/lib/utils'
 import { LogoMark } from '@/components/Brand'
 
+/**
+ * Recording controls: a slim vertical pill on the right edge of the screen,
+ * out of the way of what you're showing. Hidden from the capture itself.
+ * Drag it by the logo or the grip to move it.
+ */
 export default function ControlBar({ start }: { start: number }) {
   const [now, setNow] = useState(Date.now())
   useEffect(() => {
@@ -13,37 +18,52 @@ export default function ControlBar({ start }: { start: number }) {
   }, [])
   const elapsed = Math.max(0, (now - (start || now)) / 1000)
   return (
-    <div className="grid h-screen w-screen place-items-center p-1">
+    <div className="grid h-screen w-screen place-items-center p-1.5">
       <motion.div
-        initial={{ y: 20, opacity: 0, scale: 0.96 }}
-        animate={{ y: 0, opacity: 1, scale: 1 }}
+        initial={{ x: 24, opacity: 0, scale: 0.96 }}
+        animate={{ x: 0, opacity: 1, scale: 1 }}
         transition={{ type: 'spring', stiffness: 380, damping: 30 }}
-        className="drag flex h-[52px] w-full items-center gap-3 rounded-full border border-white/10 bg-[#0d0d12]/95 pl-2 pr-2 shadow-[0_12px_40px_rgba(0,0,0,.55)]"
+        className="drag relative flex h-full w-full flex-col items-center rounded-[34px] border border-white/10 bg-[#0d0d12]/95 py-3 shadow-[0_16px_44px_rgba(0,0,0,.6)]"
       >
-        <div className="grid h-9 w-9 place-items-center rounded-full bg-white/[0.05]">
+        <div className="grid h-10 w-10 place-items-center rounded-full bg-white/[0.05]" title="Drag to move">
           <LogoMark className="h-5 w-5" />
         </div>
-        <div className="flex items-center gap-2">
+
+        <div className="mt-4 flex flex-col items-center gap-1.5">
           <span className="relative flex h-2.5 w-2.5">
             <span className="absolute inset-0 animate-ping rounded-full bg-red-500/70" />
             <span className="relative h-2.5 w-2.5 rounded-full bg-red-500" />
           </span>
-          <span className="w-[54px] font-medium tabular-nums text-[14px] text-white">{fmtTime(elapsed)}</span>
+          <span className="text-[13px] font-semibold tabular-nums text-white">{fmtTime(elapsed)}</span>
         </div>
-        <div className="flex-1" />
+
+        <div className="my-4 h-px w-8 bg-white/10" />
+
         <button
-          title="Discard recording"
+          title={`Stop recording (${modKey}+Shift+2)`}
+          onClick={() => window.ilf.rec.requestStop()}
+          className="no-drag grid h-12 w-12 place-items-center rounded-full bg-[#ff3b5c] text-white shadow-[0_8px_22px_-4px_rgba(255,59,92,.75)] transition-all hover:scale-105 hover:bg-[#ff4d6b] active:scale-95"
+        >
+          <Square className="h-4 w-4" fill="currentColor" />
+        </button>
+        <span className="mt-1.5 text-[9.5px] font-semibold uppercase tracking-[.12em] text-zinc-500">Stop</span>
+
+        <button
+          title="Discard this recording"
           onClick={() => window.ilf.rec.cancel()}
-          className="no-drag grid h-9 w-9 place-items-center rounded-full text-zinc-400 transition-colors hover:bg-white/10 hover:text-white"
+          className="no-drag mt-3 grid h-9 w-9 place-items-center rounded-full text-zinc-400 ring-1 ring-white/10 transition-colors hover:bg-white/10 hover:text-white"
         >
           <X className="h-4 w-4" />
         </button>
-        <button
-          onClick={() => window.ilf.rec.requestStop()}
-          className="no-drag flex h-9 items-center gap-2 rounded-full bg-[#ff3b5c] px-4 text-[13px] font-semibold text-white shadow-[0_6px_20px_-4px_rgba(255,59,92,.7)] transition-all hover:bg-[#ff4d6b] active:scale-95"
-        >
-          <Square className="h-3 w-3" fill="currentColor" /> Stop
-        </button>
+
+        <div className="mt-auto flex flex-col gap-[3px] pb-0.5 opacity-40" aria-hidden="true">
+          {[0, 1, 2].map((i) => (
+            <span key={i} className="flex gap-[3px]">
+              <i className="h-[3px] w-[3px] rounded-full bg-white" />
+              <i className="h-[3px] w-[3px] rounded-full bg-white" />
+            </span>
+          ))}
+        </div>
       </motion.div>
     </div>
   )

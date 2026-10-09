@@ -7,7 +7,7 @@ import { drawFrame, drawTransition, outputSize, type FrameSources } from '@/engi
 import { projectFile } from '@/engine/types'
 import { playSfx, keyVariant, zoomCues, liveCtx, loadUserSound } from '@/engine/sounds'
 import { loadBgImage } from '@/engine/backgrounds'
-import { MAIN, cameraOf, clipAt, seqDuration, seqEvents, sourceInfo, transitionAt, transitionCuts } from '@/engine/sequence'
+import { MAIN, cameraOf, clipAt, cropOf, seqDuration, seqEvents, sourceInfo, transitionAt, transitionCuts } from '@/engine/sequence'
 import { fmtTime } from '@/lib/utils'
 
 /** Imperative player shared by preview, timeline and keyboard shortcuts. */
@@ -41,7 +41,7 @@ export function Preview() {
   const [fs, setFs] = useState(false)
   const dirty = useRef(true)
 
-  const motionKey = JSON.stringify([edit.zoom, edit.clips, edit.cursor.smoothing, edit.cursor.hideIdle, edit.cursor.hideTyping, edit.cursor.hidden])
+  const motionKey = JSON.stringify([edit.zoom, edit.clips, edit.cursor.smoothing, edit.cursor.hideIdle, edit.cursor.hideTyping, edit.cursor.hidden, edit.crops])
   // eslint-disable-next-line react-hooks/exhaustive-deps
   const tracks = useMemo(() => new MotionTracks(project, edit), [project, motionKey])
   // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -92,7 +92,8 @@ export function Preview() {
 
   // fit canvas into the available area keeping the output aspect
   const firstSrc = sourceInfo(project, edit.clips[0]?.source ?? MAIN)
-  const [ow, oh] = outputSize(edit.aspect, firstSrc?.width || 1920, firstSrc?.height || 1080, 1080)
+  const firstCrop = cropOf(edit.crops, edit.clips[0]?.source ?? MAIN)
+  const [ow, oh] = outputSize(edit.aspect, (firstSrc?.width || 1920) * firstCrop.w, (firstSrc?.height || 1080) * firstCrop.h, 1080)
   useEffect(() => {
     const el = stageRef.current!
     const ro = new ResizeObserver(() => {
@@ -366,6 +367,7 @@ export function Preview() {
         screen: v.readyState >= 2 ? v : null,
         screenW: v.videoWidth,
         screenH: v.videoHeight,
+        crop: cropOf(e.crops, hit.clip.source),
         cam: e.camera.enabled && cam && cam.readyState >= 2 && camInfo && hit.srcT >= camInfo.offset ? cam : null,
         camW: cam?.videoWidth ?? 0,
         camH: cam?.videoHeight ?? 0
@@ -377,7 +379,7 @@ export function Preview() {
         const liveIsA = hit.index === trn.a
         const held = liveIsA ? hold(b.source, b.in) : hold(a.source, holdTimeA(a.out))
         if (held) {
-          const heldSrc: FrameSources = { screen: held, screenW: held.width, screenH: held.height, cam: null, camW: 0, camH: 0 }
+          const heldSrc: FrameSources = { screen: held, screenW: held.width, screenH: held.height, crop: cropOf(e.crops, liveIsA ? b.source : a.source), cam: null, camW: 0, camH: 0 }
           const TA = Math.min(T, trn.cut - 1e-4)
           const TB = Math.max(T, trn.cut)
           drawTransition(ctx, c.width, c.height, trn.kind, trn.p, { t: TA, src: liveIsA ? liveSrc : heldSrc }, { t: TB, src: liveIsA ? heldSrc : liveSrc }, e, tr)

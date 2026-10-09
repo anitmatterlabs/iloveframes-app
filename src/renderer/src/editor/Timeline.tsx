@@ -133,7 +133,7 @@ export function Timeline() {
   const seqDur = seqDuration(edit.clips)
   const dur = Math.max(0.1, frozen ?? seqDur)
   const starts = seqStarts(edit.clips)
-  const seqClicks = useMemo(() => seqEvents(project, edit.clips).clicks, [project, edit.clips])
+  const seqClicks = useMemo(() => seqEvents(project, edit.clips, edit.crops).clicks, [project, edit.clips, edit.crops])
 
   useEffect(() => {
     const el = scrollRef.current!

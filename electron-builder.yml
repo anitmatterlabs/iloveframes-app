@@ -13,6 +13,8 @@ extraResources:
     to: icon.png
   - from: resources/native
     to: native
+  - from: resources/wallpapers
+    to: wallpapers
 asarUnpack:
   - node_modules/ffmpeg-static/**
   - node_modules/uiohook-napi/**

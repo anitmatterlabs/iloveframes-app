@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import { AnimatePresence, motion } from 'framer-motion'
-import { ChevronLeft, Download, FilePlus2, Maximize2, Pause, Play, Redo2, Scissors, SkipBack, SkipForward, SlidersHorizontal, Sparkles, Trash2, Undo2, ZoomIn } from 'lucide-react'
+import { ChevronLeft, Crop, Download, FilePlus2, Maximize2, Pause, Play, Redo2, Scissors, SkipBack, SkipForward, SlidersHorizontal, Sparkles, Trash2, Undo2, ZoomIn } from 'lucide-react'
 import { Titlebar, LogoMark } from '@/components/Brand'
 import { Button } from '@/components/ui/button'
 import { Tip } from '@/components/ui/tooltip'
@@ -15,6 +15,7 @@ import { cn, fmtTime, modKey } from '@/lib/utils'
 import { seqDuration } from '@/engine/sequence'
 import { AccountBadge } from '@/components/Account'
 import { AccountOrb, HelpMenu } from '@/components/Pro'
+import { CropEditor, openCrop } from '@/editor/CropEditor'
 import { useFirstRunTour } from '@/components/Tour'
 import { navigate } from '@/App'
 
@@ -91,6 +92,9 @@ function Transport({ onToast }: { onToast: (m: string) => void }) {
             <FilePlus2 className="h-4 w-4" />
           </ToolBtn>
           <div className="mx-1 h-5 w-px bg-white/10" />
+          <ToolBtn tip="Crop video (C)" onClick={() => openCrop()}>
+            <Crop className="h-4 w-4" />
+          </ToolBtn>
           <ToolBtn tip="Full screen preview (F)" onClick={() => player.fullscreen()}>
             <Maximize2 className="h-4 w-4" />
           </ToolBtn>
@@ -191,6 +195,9 @@ export default function Editor({ id }: { id: string }) {
         flash(splitAtPlayhead() ? 'Clip split at ' + fmtTime(s.time, true) : 'Move the playhead inside a clip to split')
       } else if (e.key.toLowerCase() === 'f' && !mod) {
         player.fullscreen()
+      } else if (e.key.toLowerCase() === 'c' && !mod) {
+        player.pause()
+        openCrop()
       } else if ((e.key === 'Delete' || e.key === 'Backspace') && s.selected) {
         removeSelected()
       } else if (e.key.toLowerCase() === 'h' && !mod) {
@@ -282,6 +289,7 @@ export default function Editor({ id }: { id: string }) {
         </div>
       </div>
       <ExportDialog open={exportOpen} onClose={() => setExportOpen(false)} />
+      <CropEditor />
       <ImportProgress />
       <AnimatePresence>
         {toast && (

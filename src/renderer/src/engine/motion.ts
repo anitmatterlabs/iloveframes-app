@@ -1,5 +1,5 @@
 import type { EditState, Project, SeqClip, SourceTrack, ZoomSegment } from './types'
-import { clipAt, seqDuration, seqEvents, sourceInfo, trackOf } from './sequence'
+import { clipAt, cropOf, seqDuration, seqEvents, sourceInfo, toCrop, trackOf } from './sequence'
 import { uid } from './types'
 
 export const clamp = (v: number, a: number, b: number) => (v < a ? a : v > b ? b : v)
@@ -53,7 +53,7 @@ export class MotionTracks {
     this.n = Math.ceil((Math.max(seqDuration(edit.clips), 0.1) + 1) * HZ) + 1
     this.camX = new Float32Array(this.n)
     this.camY = new Float32Array(this.n)
-    this.clicks = seqEvents(project, edit.clips).clicks
+    this.clicks = seqEvents(project, edit.clips, edit.crops).clicks
     for (const id of new Set(edit.clips.map((c) => c.source))) {
       const tr = trackOf(project, id)
       if (!tr || !tr.events.cursor.length) continue
@@ -261,19 +261,20 @@ export class MotionTracks {
   private at(T: number) {
     const hit = clipAt(this.edit.clips, T)
     const c = hit ? this.cursors.get(hit.clip.source) : undefined
-    return hit && c ? { c, st: hit.srcT } : null
+    return hit && c ? { c, st: hit.srcT, crop: cropOf(this.edit.crops, hit.clip.source) } : null
   }
 
-  /** Smoothed cursor position at sequence time T (screen centre for untracked clips). */
+  /** Smoothed cursor position at sequence time T, inside the clip's crop (screen centre for untracked clips). */
   private seqCursor(T: number) {
     const h = this.at(T)
     if (!h) return { x: 0.5, y: 0.5 }
-    return { x: this.sample(h.c.curX, h.st), y: this.sample(h.c.curY, h.st) }
+    return toCrop(h.crop, this.sample(h.c.curX, h.st), this.sample(h.c.curY, h.st))
   }
 
-  /** Display height of the recording under T, for sizing the cursor. */
+  /** Height (in display points) of what's on screen under T, for sizing the cursor. */
   displayH(T: number) {
-    return this.at(T)?.c.displayH ?? this.project.display.height
+    const h = this.at(T)
+    return h ? h.c.displayH * h.crop.h : this.project.display.height
   }
 
   cursorAt(t: number) {
@@ -285,7 +286,8 @@ export class MotionTracks {
       const fade = Math.min(0.3, (r.end - r.start) / 2)
       a *= 1 - Math.min(easeInOut((t - r.start) / fade), easeInOut((r.end - t) / fade))
     }
-    return { x: this.sample(h.c.curX, h.st), y: this.sample(h.c.curY, h.st), a }
+    const p = toCrop(h.crop, this.sample(h.c.curX, h.st), this.sample(h.c.curY, h.st))
+    return { x: p.x, y: p.y, a }
   }
 
   /** Current cursor shape plus a short crossfade from the previous one. */
@@ -316,9 +318,9 @@ export class MotionTracks {
 }
 
 /** Auto-zoom: cluster clicks + typing bursts into smooth zoom segments. */
-export function autoZoomSegments(project: Project, clips: SeqClip[], scale = 2): ZoomSegment[] {
+export function autoZoomSegments(project: Project, clips: SeqClip[], scale = 2, crops?: EditState['crops']): ZoomSegment[] {
   const dur = seqDuration(clips)
-  const ev = seqEvents(project, clips)
+  const ev = seqEvents(project, clips, crops)
   const raw: { s: number; e: number; x: number; y: number }[] = []
   const clicks = ev.clicks.filter((c) => c.t > 0.2 && c.t < dur - 0.2)
   let group: typeof clicks = []

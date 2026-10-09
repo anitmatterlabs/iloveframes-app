@@ -1,4 +1,4 @@
-import type { EditState, MediaSource, Project, SeqClip, SourceTrack, TransitionKind } from './types'
+import type { CropRect, EditState, MediaSource, Project, SeqClip, SourceTrack, TransitionKind } from './types'
 import { projectFile, uid } from './types'
 
 /**
@@ -101,14 +101,32 @@ export function cameraOf(project: Project, id: string): { file: string; offset: 
   return project.sources?.find((s) => s.id === id)?.camera ?? null
 }
 
-/** Recording events (clicks / keys) of every tracked source, remapped into sequence time. */
-export function seqEvents(project: Project, clips: SeqClip[]) {
+export const FULL: CropRect = { x: 0, y: 0, w: 1, h: 1 }
+type Crops = Record<string, CropRect> | undefined
+
+/** The crop for a source (whole frame when none). */
+export const cropOf = (crops: Crops, id: string): CropRect => {
+  const c = crops?.[id]
+  return c && c.w > 0 && c.h > 0 ? c : FULL
+}
+
+/** A point in the full frame -> the same point inside the cropped view. */
+export const toCrop = (c: CropRect, x: number, y: number) => ({ x: (x - c.x) / c.w, y: (y - c.y) / c.h })
+
+/** Recording events (clicks / keys) of every tracked source, remapped into sequence time (and into each source's crop). */
+export function seqEvents(project: Project, clips: SeqClip[], crops?: Crops) {
   const clicks: { t: number; x: number; y: number }[] = []
   const keys: { t: number; i: number }[] = []
   for (const id of new Set(clips.map((c) => c.source))) {
     const tr = trackOf(project, id)
     if (!tr) continue
-    for (const [t, x, y] of tr.events.clicks) for (const T of srcToSeq(clips, id, t)) clicks.push({ t: T, x, y })
+    const c = cropOf(crops, id)
+    for (const [t, x, y] of tr.events.clicks) {
+      // a click outside the cropped view can't be seen, so it shouldn't pull a zoom
+      if (x < c.x || x > c.x + c.w || y < c.y || y > c.y + c.h) continue
+      const p = toCrop(c, x, y)
+      for (const T of srcToSeq(clips, id, t)) clicks.push({ t: T, x: p.x, y: p.y })
+    }
     tr.events.keys.forEach((t, i) => {
       for (const T of srcToSeq(clips, id, t)) keys.push({ t: T, i })
     })

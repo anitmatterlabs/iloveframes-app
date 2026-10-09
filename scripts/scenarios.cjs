@@ -682,3 +682,79 @@ module.exports.panels = async (app, win, out) => {
   // hand the first-run guides back to the real user
   await win.evaluate((tabs) => { ['editor', 'home', ...tabs.map((t) => 'tab-' + t)].forEach((n) => localStorage.removeItem(`ilf.tour.${n}.v1`)) }, tabs)
 }
+// Area picker + area recording + vertical control bar.
+module.exports.area = async (app, win, out) => {
+  const shot = (p, n) => p.screenshot({ path: path.join(out, n + '.png') })
+  const d = await app.evaluate(({ screen }) => { const p = screen.getPrimaryDisplay(); return { id: String(p.id), W: p.size.width, H: p.size.height, sf: p.scaleFactor } })
+  console.log('display', JSON.stringify(d))
+  // 1) the picker: draw a rectangle and confirm with Enter
+  const res = win.evaluate((id) => window.ilf.area.pick(id, null), d.id)
+  let pw = null
+  for (let i = 0; i < 40 && !pw; i++) { await win.waitForTimeout(200); pw = app.windows().find((w) => w.url().includes('/area')) }
+  await pw.waitForTimeout(900)
+  await shot(pw, 'area-empty')
+  await pw.mouse.move(260, 180); await pw.mouse.down(); await pw.mouse.move(900, 500, { steps: 12 }); await pw.mouse.move(1160, 690, { steps: 12 }); await pw.mouse.up()
+  await pw.waitForTimeout(500)
+  await shot(pw, 'area-drawn')
+  await pw.keyboard.press('Enter').catch(() => {}) // the picker closes itself on Enter
+  const picked = await res
+  console.log('picked', JSON.stringify(picked))
+  // 2) record that area
+  const prefs = await win.evaluate(() => ['countdown', 'camOn', 'micEnabled', 'captureMode', 'areas'].map((k) => [k, localStorage.getItem('ilf.' + k)]))
+  await win.evaluate(([id, a]) => { localStorage.setItem('ilf.countdown', '"0"'); localStorage.setItem('ilf.camOn', 'false'); localStorage.setItem('ilf.micEnabled', 'false'); localStorage.setItem('ilf.captureMode', '"area"'); localStorage.setItem('ilf.areas', JSON.stringify({ [id]: a })); location.reload() }, [d.id, picked])
+  await win.waitForTimeout(4000)
+  await shot(win, 'home-area')
+  try {
+    await win.getByText('Start recording').click()
+    const { spawn } = require('child_process')
+    spawn('powershell', ['-ExecutionPolicy', 'Bypass', '-File', path.join(__dirname, 'mouse.ps1')], { stdio: 'ignore' })
+    let cb = null
+    for (let i = 0; i < 40 && !cb; i++) { await win.waitForTimeout(200); cb = app.windows().find((w) => w.url().includes('/controlbar')) }
+    await cb.waitForTimeout(1500)
+    await shot(cb, 'controlbar')
+    const bounds = await app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows().map((w) => ({ url: w.webContents.getURL().split('#')[1] || w.webContents.getURL().slice(0, 30), b: w.getBounds() })))
+    console.log('windows', JSON.stringify(bounds))
+    await win.waitForTimeout(5000)
+    await win.evaluate(() => window.ilf.rec.requestStop())
+    for (let i = 0; i < 60; i++) { await win.waitForTimeout(1000); if ((await win.evaluate(() => location.hash)).includes('editor')) break }
+    await win.waitForTimeout(3500)
+    await shot(win, 'area-editor')
+    const p = await win.evaluate(async () => { const id = decodeURIComponent(location.hash.split('/editor/')[1]); return window.ilf.projects.load(id) })
+    const xs = p.events.cursor.map((c) => c[1]), ys = p.events.cursor.map((c) => c[2])
+    console.log('PROJECT', JSON.stringify({ id: p.id, display: p.display, area: p.area, file: p.screenFile, cursorX: [Math.min(...xs).toFixed(2), Math.max(...xs).toFixed(2)], cursorY: [Math.min(...ys).toFixed(2), Math.max(...ys).toFixed(2)], clicks: p.events.clicks.length }))
+  } finally {
+    await win.evaluate((prefs) => prefs.forEach(([k, v]) => (v === null ? localStorage.removeItem('ilf.' + k) : localStorage.setItem('ilf.' + k, v))), prefs)
+  }
+}
+// Crop after recording: C opens the editor, drag a handle, apply, export.
+module.exports.crop = async (app, win, out) => {
+  const shot = (n) => win.screenshot({ path: path.join(out, n + '.png') })
+  await win.evaluate(() => { ['home', 'editor'].forEach((n) => localStorage.setItem(`ilf.tour.${n}.v1`, 'done')); ['clips', 'background', 'frame', 'cursor', 'zoom', 'camera', 'audio'].forEach((t) => localStorage.setItem(`ilf.tour.tab-${t}.v1`, 'done')) })
+  await win.evaluate((id) => { location.hash = '/editor/' + encodeURIComponent(id) }, process.env.PID)
+  await win.waitForTimeout(4500)
+  await win.evaluate(() => window.__ilfPlayer.seek(2))
+  await win.waitForTimeout(500)
+  await win.keyboard.press('c')
+  await win.waitForTimeout(1800)
+  await shot('crop-open')
+  const se = win.locator('span.cursor-nwse-resize, span[style*="nwse-resize"]').last()
+  const b = await se.boundingBox()
+  await win.mouse.move(b.x + b.width / 2, b.y + b.height / 2); await win.mouse.down(); await win.mouse.move(b.x - 220, b.y - 140, { steps: 10 }); await win.mouse.up()
+  const nw = win.locator('span[style*="nwse-resize"]').first()
+  const a = await nw.boundingBox()
+  await win.mouse.move(a.x + a.width / 2, a.y + a.height / 2); await win.mouse.down(); await win.mouse.move(a.x + 90, a.y + 60, { steps: 10 }); await win.mouse.up()
+  await win.waitForTimeout(400)
+  await shot('crop-dragged')
+  await win.getByRole('button', { name: /Apply crop/ }).click()
+  await win.waitForTimeout(1500)
+  await shot('crop-applied')
+  await win.waitForTimeout(800)
+  const p = await win.evaluate((id) => window.ilf.projects.load(id), process.env.PID)
+  console.log('CROPS', JSON.stringify(p.edit?.crops))
+  await win.getByRole('button', { name: 'Export' }).first().click()
+  await win.waitForTimeout(500)
+  await win.getByRole('button', { name: /Export MP4/ }).click()
+  await win.getByText('Your video is ready').waitFor({ timeout: 300000 })
+  console.log('EXPORTED')
+  await win.evaluate(() => ['home', 'editor', 'tab-clips', 'tab-background', 'tab-frame', 'tab-cursor', 'tab-zoom', 'tab-camera', 'tab-audio'].forEach((n) => localStorage.removeItem(`ilf.tour.${n}.v1`)))
+}

@@ -120,6 +120,8 @@ export interface FrameSources {
   screen: CanvasImageSource | null
   screenW: number
   screenH: number
+  /** show only this part of the frame (fractions); whole frame when missing */
+  crop?: { x: number; y: number; w: number; h: number }
   cam: CanvasImageSource | null
   camW: number
   camH: number
@@ -143,15 +145,21 @@ interface Layout {
   k: number
   vw: number
   vh: number
+  /** where the visible (cropped) part starts inside the source frame, in source pixels */
+  ox: number
+  oy: number
   fr: Rect
   radius: number
 }
 
 function layout(edit: EditState, W: number, H: number, src: FrameSources): Layout {
   const k = Math.min(W, H) / 1080
-  const vw = src.screenW || 1920
-  const vh = src.screenH || 1080
-  return { k, vw, vh, fr: frameRect(edit, W, H, vw, vh), radius: edit.radius * k * (edit.padding < 0.005 ? 0 : 1) }
+  const fw = src.screenW || 1920
+  const fh = src.screenH || 1080
+  const c = src.crop ?? { x: 0, y: 0, w: 1, h: 1 }
+  const vw = fw * c.w
+  const vh = fh * c.h
+  return { k, vw, vh, ox: fw * c.x, oy: fh * c.y, fr: frameRect(edit, W, H, vw, vh), radius: edit.radius * k * (edit.padding < 0.005 ? 0 : 1) }
 }
 
 /** Background + drop shadow: never change over time, painted once and blitted. */
@@ -178,7 +186,7 @@ function paintWindow(ctx: Ctx, t: number, edit: EditState, tracks: MotionTracks,
   ctx.save()
   roundRectPath(ctx, fr.x, fr.y, fr.w, fr.h, radius)
   ctx.clip()
-  if (src.screen) ctx.drawImage(src.screen, sx, sy, sw, sh, fr.x, fr.y, fr.w, fr.h)
+  if (src.screen) ctx.drawImage(src.screen, L.ox + sx, L.oy + sy, sw, sh, fr.x, fr.y, fr.w, fr.h)
   else {
     ctx.fillStyle = '#0b0b0f'
     ctx.fillRect(fr.x, fr.y, fr.w, fr.h)

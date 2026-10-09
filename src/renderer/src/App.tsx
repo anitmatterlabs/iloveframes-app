@@ -4,6 +4,7 @@ import Editor from './pages/Editor'
 import Shot from './pages/Shot'
 import ControlBar from './pages/ControlBar'
 import Countdown from './pages/Countdown'
+import AreaPicker from './pages/AreaPicker'
 import { TooltipProvider } from './components/ui/tooltip'
 import { AccountPanel, LicenseGate, UpdateToast } from './components/Account'
 import { Titlebar, LogoMark, Wordmark } from './components/Brand'
@@ -30,6 +31,13 @@ export default function App() {
   const params = new URLSearchParams(query)
   if (path === '/controlbar') return <ControlBar start={Number(params.get('start'))} />
   if (path === '/countdown') return <Countdown n={Number(params.get('n') || 3)} />
+  if (path === '/area') {
+    let cur = null
+    try {
+      cur = JSON.parse(params.get('cur') || 'null')
+    } catch {}
+    return <AreaPicker W={Number(params.get('w'))} H={Number(params.get('h'))} sf={Number(params.get('sf') || 1)} initial={cur} />
+  }
   return (
     <TooltipProvider delayDuration={250}>
       <div key={path.startsWith('/editor/') ? path : path} className="page-in h-full">

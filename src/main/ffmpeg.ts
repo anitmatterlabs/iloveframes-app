@@ -13,6 +13,24 @@ export function ffmpegPath(): string {
   return p
 }
 
+/** Part of the captured screen to keep, as fractions of the full frame (0..1). */
+export interface CropFrac {
+  x: number
+  y: number
+  w: number
+  h: number
+}
+
+/**
+ * ffmpeg crop filter for an area of the screen. Written relative to the input
+ * size (iw/ih) so it is right for any capture backend and any pixel density;
+ * width/height stay even for H.264.
+ */
+export const cropFilter = (c: CropFrac) => {
+  const f = (v: number) => Math.min(1, Math.max(0, v)).toFixed(6)
+  return `crop=trunc(iw*${f(c.w)}/2)*2:trunc(ih*${f(c.h)}/2)*2:trunc(iw*${f(c.x)}):trunc(ih*${f(c.y)})`
+}
+
 export function runFfmpeg(args: string[], onProgress?: (sec: number) => void): Promise<void> {
   return new Promise((resolve, reject) => {
     const proc = spawn(ffmpegPath(), ['-hide_banner', '-y', ...args], { windowsHide: true })

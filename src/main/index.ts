@@ -11,9 +11,9 @@ import { Readable } from 'stream'
 import { randomUUID } from 'crypto'
 import { tmpdir } from 'os'
 import { InputTracker, startNativeCapture } from './recorder'
-import { runFfmpeg, LiveCapture, captureOutput } from './ffmpeg'
+import { runFfmpeg, LiveCapture, captureOutput, cropFilter, type CropFrac } from './ffmpeg'
 import { initLicense, status as licenseStatus, isUnlocked, activate as licenseActivate, deactivate as licenseDeactivate, setName as licenseSetName } from './license'
-import { importWallpapers, listWallpapers, removeWallpaper, importSounds, listSounds, removeSound } from './library'
+import { importWallpapers, listWallpapers, removeWallpaper, importSounds, listSounds, removeSound, bundledWallpaperDir } from './library'
 import { appendRecData, readRecData, readSiblingProject, nextNumber, peekName, commitName, pad3 } from './ilfdata'
 
 const isMac = process.platform === 'darwin'
@@ -77,8 +77,9 @@ const MIME: Record<string, string> = { '.mp3': 'audio/mpeg', '.m4a': 'audio/mp4'
 function registerMediaProtocol() {
   protocol.handle('ilf', async (req) => {
     const url = new URL(req.url)
-    // ilf://media/<abs path encoded>
-    const file = decodeURIComponent(url.pathname.replace(/^\//, ''))
+    // ilf://media/<abs path encoded>, or ilf://wallpaper/<file> for the wallpapers that ship with the app
+    const rest = decodeURIComponent(url.pathname.replace(/^\//, ''))
+    const file = url.hostname === 'wallpaper' ? join(bundledWallpaperDir(), basename(rest)) : rest
     if (!existsSync(file)) return new Response('not found', { status: 404 })
     const size = statSync(file).size
     const type = MIME[extname(file).toLowerCase()] || 'application/octet-stream'
@@ -113,8 +114,46 @@ interface Session {
   stopWall: number
   captureStopped: Promise<void>
   name: string
+  /** recorded area as fractions of the display, or null for the full screen */
+  area: CropFrac | null
 }
 let rec: Session | null = null
+let areaWin: BrowserWindow | null = null
+
+/** Area in DIPs relative to the display -> fractions, clamped and at least 64 px. */
+function toFrac(display: Display, a?: { x: number; y: number; w: number; h: number } | null): CropFrac | null {
+  if (!a) return null
+  const W = display.size.width
+  const H = display.size.height
+  const x = Math.max(0, Math.min(a.x, W - 64))
+  const y = Math.max(0, Math.min(a.y, H - 64))
+  const w = Math.max(64, Math.min(a.w, W - x))
+  const h = Math.max(64, Math.min(a.h, H - y))
+  if (w >= W - 2 && h >= H - 2) return null // the whole screen is just "full screen"
+  return { x: x / W, y: y / H, w: w / W, h: h / H }
+}
+
+/** A thin outline around the recorded area. Excluded from the capture, ignores the mouse. */
+function showAreaOutline(display: Display, f: CropFrac) {
+  const b = display.bounds
+  const pad = 3
+  const r = { x: Math.round(b.x + f.x * b.width) - pad, y: Math.round(b.y + f.y * b.height) - pad, width: Math.round(f.w * b.width) + pad * 2, height: Math.round(f.h * b.height) + pad * 2 }
+  areaWin = new BrowserWindow({
+    ...r, frame: false, transparent: true, resizable: false, movable: false, focusable: false, skipTaskbar: true, hasShadow: false, alwaysOnTop: true, show: false,
+    webPreferences: { sandbox: true }
+  })
+  areaWin.setIgnoreMouseEvents(true)
+  areaWin.setAlwaysOnTop(true, 'screen-saver')
+  areaWin.setContentProtection(true)
+  areaWin.loadURL('data:text/html,' + encodeURIComponent(
+    '<html><body style="margin:0;background:transparent;overflow:hidden"><div style="position:fixed;inset:0;border:2px dashed rgba(255,77,141,.9);border-radius:6px;box-shadow:0 0 0 1px rgba(0,0,0,.35)"></div></body></html>'
+  ))
+  areaWin.once('ready-to-show', () => {
+    areaWin?.showInactive()
+    areaWin?.setContentProtection(true)
+  })
+  areaWin.on('closed', () => (areaWin = null))
+}
 
 function displayFor(id: string | number): Display {
   return screen.getAllDisplays().find((d) => String(d.id) === String(id)) ?? screen.getPrimaryDisplay()
@@ -142,12 +181,13 @@ async function showCountdown(display: Display, seconds: number) {
 }
 
 function openControlBar(display: Display, startWall: number) {
-  const W = 300
-  const H = 64
+  // a slim vertical pill on the right edge, out of the way of what you're showing
+  const W = 84
+  const H = 324
   const b = display.workArea
   controlWin = new BrowserWindow({
-    x: Math.round(b.x + b.width / 2 - W / 2),
-    y: Math.round(b.y + b.height - H - 28),
+    x: Math.round(b.x + b.width - W - 12),
+    y: Math.round(b.y + b.height / 2 - H / 2),
     width: W, height: H, frame: false, transparent: true, resizable: false, alwaysOnTop: true,
     skipTaskbar: true, hasShadow: false, minimizable: false, maximizable: false, fullscreenable: false, show: false,
     webPreferences: { preload: join(__dirname, '../preload/index.js'), sandbox: false, devTools: !app.isPackaged }
@@ -171,13 +211,14 @@ async function beginStop() {
   rec.tracker.stop()
   globalShortcut.unregister('CommandOrControl+Shift+2')
   controlWin?.close()
+  areaWin?.close()
   // stop the screen capture right away, before any iloveframes window comes back
   rec.captureStopped = rec.capture ? rec.capture.stop() : Promise.resolve()
   // tell the main renderer to flush camera/mic recorders, it then calls rec:finalize
   mainWin?.webContents.send('rec:stop')
 }
 
-ipcMain.handle('rec:prepare', async (_e, opts: { displayId: string; countdown: number; mode: 'auto' | 'manual'; fps: number }) => {
+ipcMain.handle('rec:prepare', async (_e, opts: { displayId: string; countdown: number; mode: 'auto' | 'manual'; fps: number; area?: { x: number; y: number; w: number; h: number } | null }) => {
   requireUnlocked()
   if (rec) throw new Error('Already recording')
   const display = displayFor(opts.displayId)
@@ -190,12 +231,13 @@ ipcMain.handle('rec:prepare', async (_e, opts: { displayId: string; countdown: n
   await showCountdown(display, opts.countdown)
 
   const tracker = new InputTracker(display)
-  rec = { id, dir, display, tracker, capture: null, engine: 'native', mode: opts.mode, stopping: false, stopWall: 0, name, captureStopped: Promise.resolve() }
+  const area = toFrac(display, opts.area)
+  rec = { id, dir, display, tracker, capture: null, engine: 'native', mode: opts.mode, stopping: false, stopWall: 0, name, captureStopped: Promise.resolve(), area }
   tracker.start()
 
   let sourceId: string | null = null
   try {
-    rec.capture = await startNativeCapture(display, dir, opts.fps || 60)
+    rec.capture = await startNativeCapture(display, dir, opts.fps || 60, area ?? undefined)
   } catch (err) {
     console.warn('[iloveframes] native capture failed, falling back to browser capture', err)
     rec.engine = 'browser'
@@ -205,6 +247,7 @@ ipcMain.handle('rec:prepare', async (_e, opts: { displayId: string; countdown: n
   }
   const startWall = rec.capture?.startWall() ?? Date.now()
   openControlBar(display, startWall)
+  if (area) showAreaOutline(display, area)
   globalShortcut.register('CommandOrControl+Shift+2', () => beginStop())
   rec.capture?.exited.then(() => {
     if (rec && !rec.stopping) beginStop() // capture died unexpectedly
@@ -222,6 +265,45 @@ ipcMain.on('rec:chunk', (_e, kind: string, data: ArrayBuffer) => {
 
 ipcMain.on('rec:request-stop', () => beginStop())
 
+/**
+ * Let the user drag out the area to record on a display. The picker is a
+ * transparent window over that display; the main window steps aside meanwhile.
+ * Resolves to the area in DIPs relative to the display, or null if cancelled.
+ */
+let picking: ((v: any) => void) | null = null
+ipcMain.handle('area:pick', async (_e, displayId: string, current?: { x: number; y: number; w: number; h: number } | null) => {
+  if (picking || rec) return null
+  const display = displayFor(displayId)
+  const b = display.bounds
+  const wasVisible = !!mainWin?.isVisible()
+  mainWin?.hide()
+  await new Promise((r) => setTimeout(r, 180))
+  const w = new BrowserWindow({
+    x: b.x, y: b.y, width: b.width, height: b.height, frame: false, transparent: true, resizable: false, movable: false,
+    alwaysOnTop: true, skipTaskbar: true, hasShadow: false, fullscreenable: false, show: false, enableLargerThanScreen: true,
+    webPreferences: { preload: join(__dirname, '../preload/index.js'), sandbox: false, devTools: !app.isPackaged }
+  })
+  w.setAlwaysOnTop(true, 'screen-saver')
+  const q = new URLSearchParams({ w: String(b.width), h: String(b.height), sf: String(display.scaleFactor) })
+  if (current) q.set('cur', JSON.stringify(current))
+  loadRoute(w, '/area?' + q.toString())
+  const result = await new Promise<any>((resolve) => {
+    picking = resolve
+    w.once('ready-to-show', () => {
+      w.show()
+      w.focus()
+    })
+    w.on('closed', () => resolve(null))
+  })
+  picking = null
+  if (!w.isDestroyed()) w.destroy()
+  if (wasVisible) mainWin?.show()
+  if (!result) return null
+  const x = Math.round(result.x), y = Math.round(result.y)
+  return { x, y, w: Math.round(Math.min(result.w, b.width - x)), h: Math.round(Math.min(result.h, b.height - y)), W: b.width, H: b.height }
+})
+ipcMain.on('area:done', (_e, area: { x: number; y: number; w: number; h: number } | null) => picking?.(area && [area.x, area.y, area.w, area.h].every(Number.isFinite) ? area : null))
+
 ipcMain.on('rec:cancel', async () => {
   if (!rec) return
   const r = rec
@@ -229,6 +311,7 @@ ipcMain.on('rec:cancel', async () => {
   r.tracker.stop()
   globalShortcut.unregister('CommandOrControl+Shift+2')
   controlWin?.close()
+  areaWin?.close()
   r.capture?.kill()
   await r.capture?.exited
   rec = null
@@ -249,7 +332,7 @@ ipcMain.handle('rec:finalize', async (_e, meta: { cameraStart?: number; micStart
 
   if (r.engine === 'browser') {
     mainWin?.webContents.send('rec:processing', 'Converting screen capture')
-    await runFfmpeg(['-i', join(r.dir, 'screen.webm'), '-c:v', 'libx264', '-preset', 'veryfast', '-crf', '16', '-pix_fmt', 'yuv420p', '-vf', 'scale=trunc(iw/2)*2:trunc(ih/2)*2', '-g', '60', '-an', '-movflags', '+faststart', join(r.dir, 'screen.mp4')])
+    await runFfmpeg(['-i', join(r.dir, 'screen.webm'), '-c:v', 'libx264', '-preset', 'veryfast', '-crf', '16', '-pix_fmt', 'yuv420p', '-vf', (r.area ? cropFilter(r.area) + ',' : '') + 'scale=trunc(iw/2)*2:trunc(ih/2)*2', '-g', '60', '-an', '-movflags', '+faststart', join(r.dir, 'screen.mp4')])
     await fsp.rm(join(r.dir, 'screen.webm'), { force: true })
   }
   if (meta.hasCamera && existsSync(join(r.dir, 'camera.webm'))) {
@@ -268,13 +351,24 @@ ipcMain.handle('rec:finalize', async (_e, meta: { cameraStart?: number; micStart
   const duration = +((r.stopWall - screenStart) / 1000).toFixed(3)
   const camera = meta.hasCamera && existsSync(join(r.dir, 'camera.mp4')) ? { file: 'camera.mp4', offset: rel(meta.cameraStart ?? screenStart) } : null
   const mic = meta.hasMic && existsSync(join(r.dir, 'mic.wav')) ? { file: 'mic.wav', offset: rel(meta.micStart ?? screenStart) } : null
+  // with an area, positions are re-expressed inside that area (0..1 = its edges), so
+  // smart zoom and the cinematic cursor work exactly as for a full-screen take
+  const A = r.area ?? { x: 0, y: 0, w: 1, h: 1 }
+  const ax = (x: number) => +((x - A.x) / A.w).toFixed(5)
+  const ay = (y: number) => +((y - A.y) / A.h).toFixed(5)
+  const inside = (x: number, y: number) => x >= A.x && x <= A.x + A.w && y >= A.y && y <= A.y + A.h
   const events = {
-    cursor: ev.cursor.map(([t, x, y]) => [rel(t), +x.toFixed(5), +y.toFixed(5)]),
+    cursor: ev.cursor.map(([t, x, y]) => [rel(t), ax(x), ay(y)]),
     cursorTypes: ev.cursorTypes.map(([t, k]) => [rel(t), k] as [number, string]),
-    clicks: ev.clicks.map(([t, x, y, b]) => [rel(t), +x.toFixed(5), +y.toFixed(5), b]),
+    // clicks outside the area weren't recorded, so they shouldn't pull a zoom there
+    clicks: ev.clicks.filter(([, x, y]) => inside(x, y)).map(([t, x, y, b]) => [rel(t), ax(x), ay(y), b]),
     keys: ev.keys.map(rel)
   }
-  const display = { width: r.display.size.width, height: r.display.size.height, scaleFactor: r.display.scaleFactor }
+  const display = {
+    width: Math.round(r.display.size.width * A.w),
+    height: Math.round(r.display.size.height * A.h),
+    scaleFactor: r.display.scaleFactor
+  }
 
   // one self-contained file: screen + webcam track + mic audio + all tracking data
   mainWin?.webContents.send('rec:processing', 'Saving recording')
@@ -289,6 +383,7 @@ ipcMain.handle('rec:finalize', async (_e, meta: { cameraStart?: number; micStart
     id: r.id,
     recId: r.id,
     screenFile,
+    area: r.area,
     name: r.name,
     createdAt: Date.now(),
     mode: r.mode,

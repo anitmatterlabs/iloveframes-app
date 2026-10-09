@@ -15,6 +15,9 @@ export interface Wallpaper {
   thumb: string
   width: number
   height: number
+  /** stable address for wallpapers that ship with the app (independent of the install folder) */
+  url?: string
+  thumbUrl?: string
 }
 
 const MAX_W = 3840
@@ -76,8 +79,28 @@ export async function importWallpapers(paths: string[], group = 'Library', names
   return added
 }
 
+/** Wallpapers that ship with the app (resources/wallpapers), on every platform. */
+export const bundledWallpaperDir = () => (app.isPackaged ? join(process.resourcesPath, 'wallpapers') : join(app.getAppPath(), 'resources', 'wallpapers'))
+
+async function bundled(): Promise<Wallpaper[]> {
+  const base = bundledWallpaperDir()
+  try {
+    const m = JSON.parse(await fsp.readFile(join(base, 'manifest.json'), 'utf8'))
+    return (m.items as any[]).map((w) => ({
+      id: 'b-' + w.id, name: w.name, group: m.group, file: join(base, w.file), thumb: join(base, w.thumb), width: w.width, height: w.height,
+      url: 'ilf://wallpaper/' + encodeURIComponent(w.file), thumbUrl: 'ilf://wallpaper/' + encodeURIComponent(w.thumb)
+    }))
+  } catch {
+    return []
+  }
+}
+
 export async function listWallpapers(): Promise<Wallpaper[]> {
-  return (await readIndex()).filter((w) => existsSync(w.file))
+  const built = (await bundled()).filter((w) => existsSync(w.file))
+  // an earlier import of the same picture shouldn't show up twice
+  const taken = new Set(built.map((w) => w.group + '/' + w.name))
+  const mine = (await readIndex()).filter((w) => existsSync(w.file) && !taken.has(w.group + '/' + w.name))
+  return [...built, ...mine]
 }
 
 export async function removeWallpaper(id: string) {

@@ -1,7 +1,7 @@
 import { app, screen, systemPreferences, Display, Rectangle } from 'electron'
 import { spawn, ChildProcess } from 'child_process'
 import { join } from 'path'
-import { LiveCapture, startLiveCapture } from './ffmpeg'
+import { LiveCapture, startLiveCapture, type CropFrac } from './ffmpeg'
 import { platform } from './platform'
 
 export interface RecordedEvents {
@@ -113,10 +113,10 @@ export function orderedDisplays(): Display[] {
   return [primary, ...all.filter((d) => d.id !== primary.id)]
 }
 
-export async function startNativeCapture(display: Display, outDir: string, fps: number): Promise<LiveCapture> {
+export async function startNativeCapture(display: Display, outDir: string, fps: number, crop?: CropFrac): Promise<LiveCapture> {
   const out = join(outDir, 'screen.mp4')
   const idx = Math.max(0, orderedDisplays().findIndex((d) => d.id === display.id))
-  const attempts = await platform.captureAttempts(display, idx, out, fps)
+  const attempts = await platform.captureAttempts(display, idx, out, fps, crop)
   let lastErr = ''
   for (const args of attempts) {
     const cap = startLiveCapture(args)

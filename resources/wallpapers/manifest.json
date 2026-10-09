@@ -1,0 +1,101 @@
+{
+ "group": "macOS",
+ "items": [
+  {
+   "id": "macos-tahoe-light",
+   "name": "Tahoe Light",
+   "file": "macos-tahoe-light.jpg",
+   "thumb": "macos-tahoe-light-thumb.jpg",
+   "width": 2400,
+   "height": 2400
+  },
+  {
+   "id": "macos-tahoe-dark",
+   "name": "Tahoe Dark",
+   "file": "macos-tahoe-dark.jpg",
+   "thumb": "macos-tahoe-dark-thumb.jpg",
+   "width": 2400,
+   "height": 2400
+  },
+  {
+   "id": "macos-sequoia-light",
+   "name": "Sequoia Light",
+   "file": "macos-sequoia-light.jpg",
+   "thumb": "macos-sequoia-light-thumb.jpg",
+   "width": 2800,
+   "height": 2800
+  },
+  {
+   "id": "macos-sequoia-dark",
+   "name": "Sequoia Dark",
+   "file": "macos-sequoia-dark.jpg",
+   "thumb": "macos-sequoia-dark-thumb.jpg",
+   "width": 2800,
+   "height": 2800
+  },
+  {
+   "id": "macos-sonoma-light",
+   "name": "Sonoma Light",
+   "file": "macos-sonoma-light.jpg",
+   "thumb": "macos-sonoma-light-thumb.jpg",
+   "width": 2000,
+   "height": 2000
+  },
+  {
+   "id": "macos-sonoma-dark",
+   "name": "Sonoma Dark",
+   "file": "macos-sonoma-dark.jpg",
+   "thumb": "macos-sonoma-dark-thumb.jpg",
+   "width": 2000,
+   "height": 2000
+  },
+  {
+   "id": "macos-ventura-light",
+   "name": "Ventura Light",
+   "file": "macos-ventura-light.jpg",
+   "thumb": "macos-ventura-light-thumb.jpg",
+   "width": 2000,
+   "height": 2000
+  },
+  {
+   "id": "macos-ventura-dark",
+   "name": "Ventura Dark",
+   "file": "macos-ventura-dark.jpg",
+   "thumb": "macos-ventura-dark-thumb.jpg",
+   "width": 2000,
+   "height": 2000
+  },
+  {
+   "id": "macos-monterey-light",
+   "name": "Monterey Light",
+   "file": "macos-monterey-light.jpg",
+   "thumb": "macos-monterey-light-thumb.jpg",
+   "width": 1400,
+   "height": 1400
+  },
+  {
+   "id": "macos-monterey-dark",
+   "name": "Monterey Dark",
+   "file": "macos-monterey-dark.jpg",
+   "thumb": "macos-monterey-dark-thumb.jpg",
+   "width": 1400,
+   "height": 1400
+  },
+  {
+   "id": "macos-big-sur-light",
+   "name": "Big Sur Light",
+   "file": "macos-big-sur-light.jpg",
+   "thumb": "macos-big-sur-light-thumb.jpg",
+   "width": 1400,
+   "height": 1400
+  },
+  {
+   "id": "macos-big-sur-dark",
+   "name": "Big Sur Dark",
+   "file": "macos-big-sur-dark.jpg",
+   "thumb": "macos-big-sur-dark-thumb.jpg",
+   "width": 1400,
+   "height": 1400
+  }
+ ]
+}

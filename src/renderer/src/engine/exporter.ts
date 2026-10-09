@@ -5,7 +5,7 @@ import { drawFrame, drawTransition, outputSize, type FrameSources } from './comp
 import { encodeWav, renderAudioMix } from './sounds'
 import { loadBgImage } from './backgrounds'
 import { demux, FrameSource, type Demuxed } from './decode'
-import { MAIN, cameraOf, clipAt, seqDuration, sourceInfo, transitionAt, transitionCuts, type SourceInfo } from './sequence'
+import { MAIN, cameraOf, clipAt, cropOf, seqDuration, sourceInfo, transitionAt, transitionCuts, type SourceInfo } from './sequence'
 
 export interface ExportOptions {
   format: 'mp4' | 'gif'
@@ -49,7 +49,8 @@ export async function exportProject(
     }
 
   const first = demuxed.get(clips[0].source)!
-  const [W, H] = outputSize(edit.aspect, first.width, first.height, opts.format === 'gif' ? Math.min(opts.height, 1080) : opts.height)
+  const fc = cropOf(edit.crops, clips[0].source)
+  const [W, H] = outputSize(edit.aspect, first.width * fc.w, first.height * fc.h, opts.format === 'gif' ? Math.min(opts.height, 1080) : opts.height)
   const fps = opts.format === 'gif' ? Math.min(opts.fps, 30) : opts.fps
 
   const canvas = document.createElement('canvas')
@@ -115,6 +116,7 @@ export async function exportProject(
         screen: sf,
         screenW: sf?.displayWidth ?? d.width,
         screenH: sf?.displayHeight ?? d.height,
+        crop: cropOf(edit.crops, hit.clip.source),
         cam: cf,
         camW: cf?.displayWidth ?? 0,
         camH: cf?.displayHeight ?? 0
@@ -127,7 +129,7 @@ export async function exportProject(
         : undefined
       if (trn && held) {
         const liveIsA = hit.index === trn.a
-        const heldSrc: FrameSources = { screen: held, screenW: held.width, screenH: held.height, cam: null, camW: 0, camH: 0 }
+        const heldSrc: FrameSources = { screen: held, screenW: held.width, screenH: held.height, crop: cropOf(edit.crops, liveIsA ? clips[trn.b].source : clips[trn.a].source), cam: null, camW: 0, camH: 0 }
         drawTransition(
           ctx, W, H, trn.kind, trn.p,
           { t: Math.min(T, trn.cut - 1e-4), src: liveIsA ? liveSrc : heldSrc },

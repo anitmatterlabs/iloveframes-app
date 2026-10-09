@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { AnimatePresence, motion } from 'framer-motion'
 import {
-  Camera, CameraOff, Check, ChevronRight, Clock, Film, FolderOpen, Image as ImageIcon, Mic, MicOff, Monitor, RefreshCw, ShieldAlert, SlidersHorizontal, Sparkles, Trash2, Wand2, Zap
+  Camera, CameraOff, Check, ChevronRight, Crop as CropIcon, Maximize, Clock, Film, FolderOpen, Image as ImageIcon, Mic, MicOff, Monitor, RefreshCw, ShieldAlert, SlidersHorizontal, Sparkles, Trash2, Wand2, Zap
 } from 'lucide-react'
 import { Titlebar, LogoMark, Wordmark } from '@/components/Brand'
 import { Button } from '@/components/ui/button'
@@ -54,6 +54,8 @@ function Tips() {
 }
 
 interface DisplayInfo { id: string; name: string; width: number; height: number; primary: boolean; thumbnail: string | null }
+/** a chosen area in DIPs relative to its display, plus that display's DIP size */
+interface AreaSel { x: number; y: number; w: number; h: number; W: number; H: number }
 
 // survives navigation: coming back Home shows everything instantly, then refreshes quietly
 const cache: { displays: DisplayInfo[]; projects: ProjectSummary[]; visited: boolean } = { displays: [], projects: [], visited: false }
@@ -130,6 +132,9 @@ export default function Home() {
   const [mode, setMode] = usePersist<'auto' | 'manual'>('mode', 'auto')
   const [countdown, setCountdown] = usePersist<'0' | '3' | '5'>('countdown', '3')
   const [fps, setFps] = usePersist<'30' | '60'>('fps', '60')
+  // record the whole screen, or just an area of it (remembered per display)
+  const [captureMode, setCaptureMode] = usePersist<'full' | 'area'>('captureMode', 'full')
+  const [areas, setAreas] = usePersist<Record<string, AreaSel>>('areas', {})
   const [cams, setCams] = useState<MediaDeviceInfo[]>([])
   const [mics, setMics] = useState<MediaDeviceInfo[]>([])
   const [camStream, setCamStream] = useState<MediaStream | null>(null)
@@ -260,8 +265,30 @@ export default function Home() {
     }
   }, [refreshProjects])
 
+  const area = captureMode === 'area' ? areas[displayId] ?? null : null
+
+  /** Open the on-screen picker. Returns the area, 'full' if they chose full screen, or null if cancelled. */
+  const pickArea = async (): Promise<AreaSel | 'full' | null> => {
+    const cur = areas[displayId]
+    const r = await window.ilf.area.pick(displayId, cur ? { x: cur.x, y: cur.y, w: cur.w, h: cur.h } : null)
+    if (!r) return null
+    if (r.w >= r.W - 2 && r.h >= r.H - 2) {
+      setCaptureMode('full')
+      return 'full'
+    }
+    setAreas((m) => ({ ...m, [displayId]: r }))
+    setCaptureMode('area')
+    return r
+  }
+
   const start = async () => {
     setError(null)
+    let rect: AreaSel | null = null
+    if (captureMode === 'area') {
+      const picked = area ?? (await pickArea())
+      if (!picked) return
+      rect = picked === 'full' ? null : picked
+    }
     setPhase('starting')
     // free preview devices
     camStream?.getTracks().forEach((t) => t.stop())
@@ -273,7 +300,8 @@ export default function Home() {
         micId: micOn ? micId || 'default' : null,
         countdown: Number(countdown),
         mode,
-        fps: Number(fps)
+        fps: Number(fps),
+        area: rect ? { x: rect.x, y: rect.y, w: rect.w, h: rect.h } : null
       })
       setPhase('recording')
     } catch (e: any) {
@@ -388,9 +416,22 @@ export default function Home() {
                   <div className="flex items-center gap-2 text-[12.5px] font-medium text-zinc-200">
                     <Monitor className="h-4 w-4 text-zinc-500" /> Screen
                   </div>
-                  <Tip content="Refresh screens">
-                    <Button variant="ghost" size="icon-sm" onClick={refreshDisplays}><RefreshCw className="h-3.5 w-3.5" /></Button>
-                  </Tip>
+                  <div className="flex items-center gap-1.5">
+                    <Segmented
+                      layoutId="capmode"
+                      size="sm"
+                      value={captureMode}
+                      onChange={setCaptureMode}
+                      className="w-[206px]"
+                      options={[
+                        { value: 'full', label: <><Maximize className="h-3 w-3" /> Full screen</> },
+                        { value: 'area', label: <><CropIcon className="h-3 w-3" /> Area</> }
+                      ]}
+                    />
+                    <Tip content="Refresh screens">
+                      <Button variant="ghost" size="icon-sm" onClick={refreshDisplays}><RefreshCw className="h-3.5 w-3.5" /></Button>
+                    </Tip>
+                  </div>
                 </div>
                 <div className={cn('grid gap-3', displays.length > 1 ? 'grid-cols-2' : 'grid-cols-1')}>
                   {displays.map((d) => {
@@ -403,6 +444,14 @@ export default function Home() {
                       >
                         <div className="checker relative aspect-video overflow-hidden rounded-lg">
                           {d.thumbnail ? <img src={d.thumbnail} className="h-full w-full object-cover" /> : <div className="grid h-full place-items-center text-zinc-600"><Monitor className="h-5 w-5" /></div>}
+                          {sel && area && (
+                            <div
+                              className="pointer-events-none absolute rounded-[3px] border-2 border-white/90 transition-all duration-300"
+                              style={{ left: `${(area.x / area.W) * 100}%`, top: `${(area.y / area.H) * 100}%`, width: `${(area.w / area.W) * 100}%`, height: `${(area.h / area.H) * 100}%`, boxShadow: '0 0 0 999px rgba(4,3,8,.72), 0 0 0 1px rgba(192,132,252,.9), 0 0 22px 2px rgba(214,77,170,.6)' }}
+                            >
+                              <span className="bg-brand absolute -top-px left-1/2 -translate-x-1/2 -translate-y-1/2 rounded-full px-1.5 py-px text-[8.5px] font-bold uppercase tracking-[.1em] text-white shadow">Area</span>
+                            </div>
+                          )}
                           {sel && phase === 'idle' && (
                             <div className="absolute left-1.5 top-1.5 flex items-center gap-1 rounded-full bg-black/55 px-1.5 py-0.5 text-[9px] font-semibold tracking-[.12em] text-white/90 backdrop-blur">
                               <span className="live-dot h-1.5 w-1.5 rounded-full bg-brand-pink" /> LIVE
@@ -420,6 +469,28 @@ export default function Home() {
                     )
                   })}
                 </div>
+                <AnimatePresence initial={false}>
+                  {captureMode === 'area' && (
+                    <motion.div initial={{ height: 0, opacity: 0 }} animate={{ height: 'auto', opacity: 1 }} exit={{ height: 0, opacity: 0 }} className="overflow-hidden">
+                      <div className="mt-3 flex items-center gap-3 rounded-xl border border-white/[0.06] bg-white/[0.02] px-3 py-2.5">
+                        <div className="grid h-8 w-8 shrink-0 place-items-center rounded-lg bg-brand-orchid/15 text-brand-lilac"><CropIcon className="h-4 w-4" /></div>
+                        <div className="min-w-0 flex-1">
+                          <div className="text-[12.5px] font-medium text-zinc-200">{area ? 'Recording an area' : 'Choose an area'}</div>
+                          <div className="truncate text-[11px] tabular-nums text-zinc-500">
+                            {area ? (() => {
+                              const d = displays.find((x) => x.id === displayId)
+                              const k = d ? d.width / area.W : 1
+                              return `${Math.round(area.w * k)} × ${Math.round(area.h * k)} px · only this part is saved`
+                            })() : 'Drag a rectangle on your screen'}
+                          </div>
+                        </div>
+                        <Button size="sm" variant={area ? 'secondary' : 'primary'} disabled={phase !== 'idle' || !displayId} onClick={() => pickArea()}>
+                          {area ? 'Change' : 'Select area'}
+                        </Button>
+                      </div>
+                    </motion.div>
+                  )}
+                </AnimatePresence>
               </div>
 
               <div className="flex flex-col divide-y divide-white/[0.05]">
@@ -491,10 +562,14 @@ export default function Home() {
 
             {/* action bar */}
             <div className="flex items-center gap-3 border-t border-white/[0.05] bg-black/20 px-5 py-3.5">
-              <Tip content="Countdown before recording starts"><Clock className="h-3.5 w-3.5 text-zinc-500" /></Tip>
-              <Segmented layoutId="cd" size="sm" value={countdown} onChange={setCountdown} options={[{ value: '0', label: 'Off' }, { value: '3', label: '3s' }, { value: '5', label: '5s' }]} className="w-[140px]" />
-              <Tip content="Frame rate"><Zap className="ml-1 h-3.5 w-3.5 text-zinc-500" /></Tip>
-              <Segmented layoutId="fps" size="sm" value={fps} onChange={setFps} options={[{ value: '30', label: '30' }, { value: '60', label: '60 fps' }]} className="w-[120px]" />
+              <div className="flex items-center gap-2.5">
+                <span className="flex items-center gap-1.5 text-[11.5px] font-medium text-zinc-400"><Clock className="h-3.5 w-3.5 text-zinc-500" /> Countdown</span>
+                <Segmented layoutId="cd" size="sm" value={countdown} onChange={setCountdown} options={[{ value: '0', label: 'Off' }, { value: '3', label: '3s' }, { value: '5', label: '5s' }]} className="w-[132px]" />
+              </div>
+              <div className="ml-2 flex items-center gap-2.5">
+                <span className="flex items-center gap-1.5 text-[11.5px] font-medium text-zinc-400"><Zap className="h-3.5 w-3.5 text-zinc-500" /> Frame rate</span>
+                <Segmented layoutId="fps" size="sm" value={fps} onChange={setFps} options={[{ value: '30', label: '30 fps' }, { value: '60', label: '60 fps' }]} className="w-[132px]" />
+              </div>
               <div className="flex-1" />
               <div className="hidden text-right text-[11px] leading-tight text-zinc-500 lg:block">
                 Stop anytime

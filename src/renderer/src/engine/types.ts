@@ -118,6 +118,16 @@ export interface EditState {
   }
   /** the edited sequence: clips played back to back */
   clips: SeqClip[]
+  /** non-destructive crop per source (fractions of the source frame); missing = whole frame */
+  crops?: Record<string, CropRect>
+}
+
+/** Part of a source frame to show, as fractions (0..1). */
+export interface CropRect {
+  x: number
+  y: number
+  w: number
+  h: number
 }
 
 export interface ProjectEvents {
@@ -213,6 +223,7 @@ export function migrateEdit(p: Project, e: any): EditState {
     camera: { ...d.camera, ...old.camera },
     audio: { ...d.audio, ...old.audio, clips: old.audio?.clips ?? [] },
     clips: old.clips?.length ? old.clips : [{ id: 'c-main', source: 'main', in: old.trim?.start ?? 0, out: old.trim?.end ?? p.duration }],
+    crops: old.crops ?? {},
     sfx: { click: { ...d.sfx.click, ...sfx.click }, zoom: { ...d.sfx.zoom, ...sfx.zoom }, typing: { ...d.sfx.typing, ...sfx.typing } }
   }
 }

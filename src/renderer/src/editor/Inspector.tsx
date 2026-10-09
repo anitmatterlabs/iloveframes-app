@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import { AnimatePresence, motion } from 'framer-motion'
 import {
-  Camera, Check, CircleHelp, Clapperboard, Crosshair, FilePlus2, Scissors, EyeOff, ImagePlus, X, Upload, Music, GripVertical, Play, Square, Plus, LayoutTemplate, MousePointer2, MousePointerClick, Palette, RotateCcw, Sparkles, Trash2, Volume2, ZoomIn
+  Camera, Check, CircleHelp, Clapperboard, Crop, Crosshair, FilePlus2, Scissors, EyeOff, ImagePlus, X, Upload, Music, GripVertical, Play, Square, Plus, LayoutTemplate, MousePointer2, MousePointerClick, Palette, RotateCcw, Sparkles, Trash2, Volume2, ZoomIn
 } from 'lucide-react'
 import { useEditor, updateEdit, patchSegment, removeSegment, addSegmentAt, addHideAt, removeHide, cursorPosAt, addClipAt, patchClip, removeClip, splitAtPlayhead, deleteSeqClip, appendSources, setTransition, setAllTransitions } from './store'
 import { player } from './Preview'
@@ -17,8 +17,9 @@ import { Button } from '@/components/ui/button'
 import { Tip } from '@/components/ui/tooltip'
 import { cn, fmtTime } from '@/lib/utils'
 import { mediaUrl, defaultEdit, uid } from '@/engine/types'
-import { MAIN, clipAt, seqEvents, sourceInfo, trackOf, type SourceInfo } from '@/engine/sequence'
+import { MAIN, clipAt, cropOf, seqEvents, sourceInfo, toCrop, trackOf, type SourceInfo } from '@/engine/sequence'
 import { TransitionIcon, TransitionPicker } from './Transitions'
+import { openCrop } from './CropEditor'
 import { offerTour, replayTour } from '@/components/Tour'
 import { useSourceThumbs } from './Timeline'
 
@@ -112,8 +113,8 @@ function LibrarySection({ title, items, bg, onPick, onRemove, action }: { title:
       <div className="grid grid-cols-3 gap-2">
         {items.map((w) => (
           <div key={w.id} className="group/w relative">
-            <Swatch title={w.name} active={bg.kind === 'image' && bg.value === mediaUrl(w.file)} onClick={() => onPick(w)}>
-              <img src={mediaUrl(w.thumb)} className="h-full w-full animate-[fadein_.35s_ease] object-cover" draggable={false} />
+            <Swatch title={w.name} active={bg.kind === 'image' && bg.value === (w.url ?? mediaUrl(w.file))} onClick={() => onPick(w)}>
+              <img src={w.thumbUrl ?? mediaUrl(w.thumb)} className="h-full w-full animate-[fadein_.35s_ease] object-cover" draggable={false} />
             </Swatch>
             {onRemove && (
               <button
@@ -145,7 +146,7 @@ function BackgroundPanel({ edit }: { edit: EditState }) {
 export function BackgroundPicker({ bg, onChange, onCommit }: { bg: EditState['background']; onChange: (bg: EditState['background'], history?: boolean) => void; onCommit?: () => void }) {
   const choose = (kind: EditState['background']['kind'], value: string) => onChange({ ...bg, kind, value })
   const { list, refresh } = useLibrary()
-  const pick = (w: LibWall) => choose('image', mediaUrl(w.file))
+  const pick = (w: LibWall) => choose('image', w.url ?? mediaUrl(w.file))
   const groups = [...new Set(list.map((w) => w.group))].sort((a, b) => (a === 'macOS' ? -1 : b === 'macOS' ? 1 : a === 'Library' ? 1 : b === 'Library' ? -1 : a.localeCompare(b)))
   const importMore = async () => {
     const added = await window.ilf.wallpapers.import('Library')
@@ -232,9 +233,45 @@ export function BackgroundPicker({ bg, onChange, onCommit }: { bg: EditState['ba
   )
 }
 
+/** Crop status for the recording under the playhead, with a way into the crop editor. */
+function CropSection({ edit }: { edit: EditState }) {
+  const project = useEditor((s) => s.project)!
+  const time = useEditor((s) => s.time)
+  const hit = clipAt(edit.clips, time)
+  const id = hit?.clip.source ?? MAIN
+  const info = sourceInfo(project, id)
+  const c = cropOf(edit.crops, id)
+  const cropped = c.w < 0.999 || c.h < 0.999
+  const W = info?.width ?? 0
+  const H = info?.height ?? 0
+  return (
+    <Section title="Crop" tour="frame-crop">
+      <div className="flex items-center gap-3 rounded-xl border border-white/[0.06] bg-white/[0.02] p-3">
+        <div className="relative h-11 w-16 shrink-0 overflow-hidden rounded-md bg-white/[0.06] ring-1 ring-white/[0.08]">
+          <div className="absolute rounded-[2px] bg-brand-orchid/30 ring-1 ring-brand-orchid" style={{ left: `${c.x * 100}%`, top: `${c.y * 100}%`, width: `${c.w * 100}%`, height: `${c.h * 100}%` }} />
+        </div>
+        <div className="min-w-0 flex-1">
+          <div className="text-[12.5px] font-medium text-zinc-200">{cropped ? 'Cropped' : 'Full frame'}</div>
+          <div className="truncate text-[11px] tabular-nums text-zinc-500">
+            {cropped ? `${Math.round(c.w * W)} × ${Math.round(c.h * H)} of ${W} × ${H}` : `${W} × ${H} · ${info?.name ?? ''}`}
+          </div>
+        </div>
+      </div>
+      <div className="grid grid-cols-2 gap-2">
+        <Button variant="outline" size="sm" onClick={() => openCrop()}><Crop className="h-3.5 w-3.5" /> {cropped ? 'Edit crop' : 'Crop video'}</Button>
+        <Button variant="ghost" size="sm" disabled={!cropped} onClick={() => set((e) => { const crops = { ...(e.crops ?? {}) }; delete crops[id]; return { ...e, crops } })}>
+          <RotateCcw className="h-3.5 w-3.5" /> Remove crop
+        </Button>
+      </div>
+      <div className="text-[11px] leading-relaxed text-zinc-500">Cropping never changes your recording or its smart data. Zooms and the cursor follow the new framing.</div>
+    </Section>
+  )
+}
+
 function FramePanel({ edit }: { edit: EditState }) {
   return (
     <>
+      <CropSection edit={edit} />
       <Section title="Aspect ratio" tour="frame-aspect">
         <div className="grid grid-cols-3 gap-2">
           {(['16:9', '9:16', '1:1', '4:3', '4:5', 'auto'] as Aspect[]).map((a) => {
@@ -327,7 +364,7 @@ function CursorPanel({ edit }: { edit: EditState }) {
       <Section title="Clicks" tour="cursor-clicks">
         <div className={cn('space-y-4', !c.enabled && 'pointer-events-none opacity-40')}>
           <Segmented layoutId="ce" size="sm" value={c.clickEffect} onChange={(v) => setC({ clickEffect: v })} options={[{ value: 'ripple', label: 'Ripple' }, { value: 'pulse', label: 'Highlight' }, { value: 'none', label: 'None' }]} />
-          <div className="text-[11px] text-zinc-500">{seqEvents(project, edit.clips).clicks.length} clicks in this video. Click sounds live in the Audio tab.</div>
+          <div className="text-[11px] text-zinc-500">{seqEvents(project, edit.clips, edit.crops).clicks.length} clicks in this video. Click sounds live in the Audio tab.</div>
         </div>
       </Section>
       <HiddenRanges edit={edit} />
@@ -367,11 +404,11 @@ function ZoomPanel({ edit }: { edit: EditState }) {
   const project = useEditor((s) => s.project)!
   const selected = useEditor((s) => s.selected)
   const seg = edit.zoom.segments.find((s) => s.id === selected)
-  const fresh = useMemo(() => autoZoomSegments(project, edit.clips), [project, edit.clips])
+  const fresh = useMemo(() => autoZoomSegments(project, edit.clips, 2, edit.crops), [project, edit.clips, edit.crops])
   const sig = (l: { start: number; end: number; scale: number; follow: boolean }[]) => l.map((z) => [z.start.toFixed(2), z.end.toFixed(2), z.scale, z.follow].join(':')).join('|')
   const upToDate = fresh.length > 0 && sig(fresh) === sig(edit.zoom.segments)
   const regen = () => {
-    set((e) => ({ ...e, zoom: { ...e.zoom, segments: autoZoomSegments(project, e.clips) } }))
+    set((e) => ({ ...e, zoom: { ...e.zoom, segments: autoZoomSegments(project, e.clips, 2, e.crops) } }))
     useEditor.getState().select(null)
   }
   return (
@@ -398,7 +435,8 @@ function ZoomPanel({ edit }: { edit: EditState }) {
               if (v === 'fixed') {
                 const hit = clipAt(edit.clips, seg.start + Math.min(0.8, (seg.end - seg.start) / 2))
                 const tk = hit ? trackOf(project, hit.clip.source) : null
-                const p = hit && tk ? cursorPosAt(tk, hit.srcT) : { x: 0.5, y: 0.5 }
+                const raw = hit && tk ? cursorPosAt(tk, hit.srcT) : null
+                const p = hit && raw ? toCrop(cropOf(edit.crops, hit.clip.source), raw.x, raw.y) : { x: 0.5, y: 0.5 }
                 patchSegment(seg.id, { follow: false, x: p.x, y: p.y })
               } else patchSegment(seg.id, { follow: true })
             }}
@@ -701,7 +739,7 @@ function AudioPanel({ edit }: { edit: EditState }) {
           <div className="text-[12px] text-zinc-500">No microphone audio in this take.</div>
         )}
       </Section>
-      <SfxPicker edit={edit} k="click" title="Click sounds" hint={`${seqEvents(project, edit.clips).clicks.length} clicks in this video`} options={CLICK_SOUNDS} preview={(id, v) => playSfx(id, v)} />
+      <SfxPicker edit={edit} k="click" title="Click sounds" hint={`${seqEvents(project, edit.clips, edit.crops).clicks.length} clicks in this video`} options={CLICK_SOUNDS} preview={(id, v) => playSfx(id, v)} />
       <SfxPicker
         edit={edit}
         k="zoom"

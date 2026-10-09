@@ -243,7 +243,7 @@ export function appendSources(sources: MediaSource[]) {
     const next: EditState = { ...e, clips }
     if (sources.some((s) => s.track)) {
       const kept = e.zoom.segments
-      const fresh = autoZoomSegments(project, clips).filter((z) => z.start >= from - 1e-3 && !kept.some((k) => z.start < k.end && z.end > k.start))
+      const fresh = autoZoomSegments(project, clips, 2, e.crops).filter((z) => z.start >= from - 1e-3 && !kept.some((k) => z.start < k.end && z.end > k.start))
       next.zoom = { ...e.zoom, segments: [...kept, ...fresh].sort((a, b) => a.start - b.start) }
     }
     if (sources.some((s) => s.track && !s.track.cursorBaked)) next.cursor = { ...e.cursor, enabled: true }
