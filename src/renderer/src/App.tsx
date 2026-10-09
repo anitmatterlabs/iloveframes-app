@@ -8,6 +8,9 @@ import { TooltipProvider } from './components/ui/tooltip'
 import { AccountPanel, LicenseGate, UpdateToast } from './components/Account'
 import { Titlebar, LogoMark, Wordmark } from './components/Brand'
 import { ChevronLeft } from 'lucide-react'
+import { ProCelebration, ProTag } from './components/Pro'
+import { FeedbackDialog } from './components/Feedback'
+import { Tour } from './components/Tour'
 
 function useHashRoute() {
   const [hash, setHash] = useState(location.hash.slice(1) || '/')
@@ -34,6 +37,9 @@ export default function App() {
       </div>
       <LicenseGate />
       <UpdateToast />
+      <Tour />
+      <FeedbackDialog />
+      <ProCelebration />
     </TooltipProvider>
   )
 }
@@ -48,9 +54,10 @@ function AccountPage() {
         <div className="h-4 w-px bg-white/10" />
         <LogoMark className="h-[20px] w-[20px]" />
         <Wordmark className="text-[13px]" />
+        <ProTag />
       </Titlebar>
       <div className="relative min-h-0 flex-1 overflow-y-auto px-6 py-10">
-        <div className="pointer-events-none absolute left-1/2 top-0 h-[360px] w-[700px] -translate-x-1/2 rounded-full bg-[radial-gradient(closest-side,rgba(139,92,246,.12),transparent)]" />
+        <div className="aurora-a pointer-events-none absolute left-1/2 top-0 h-[360px] w-[700px] -translate-x-1/2 rounded-full bg-[radial-gradient(closest-side,rgba(139,92,246,.12),transparent)]" />
         <div className="relative">
           <AccountPanel />
         </div>

@@ -1,6 +1,6 @@
 import {
   app, BrowserWindow, ipcMain, screen, desktopCapturer, protocol, dialog, shell,
-  systemPreferences, globalShortcut, session, Display, nativeImage, clipboard
+  systemPreferences, globalShortcut, session, Display, nativeImage, clipboard, net
 } from 'electron'
 import { join, extname, basename } from 'path'
 import { CONFIG } from './config'
@@ -721,6 +721,28 @@ ipcMain.handle('license:deactivate', () => licenseDeactivate())
 ipcMain.handle('license:set-name', (_e, name: string) => licenseSetName(String(name ?? '')))
 ipcMain.on('license:allowed', (e) => (e.returnValue = isUnlocked()))
 ipcMain.handle('license:buy', () => shell.openExternal(CONFIG.buyUrl))
+
+// In-app feedback: posted from main so it isn't subject to page CORS rules.
+ipcMain.handle('feedback:send', async (_e, f: { kind?: string; message?: string; email?: string; name?: string }) => {
+  const message = String(f?.message ?? '').trim().slice(0, 4000)
+  if (message.length < 3) return { ok: false, error: 'Please write a little more.' }
+  const body = {
+    kind: String(f?.kind ?? 'idea').slice(0, 20),
+    message,
+    email: String(f?.email ?? '').trim().slice(0, 200),
+    name: String(f?.name ?? '').trim().slice(0, 80),
+    version: app.getVersion(),
+    os: `${process.platform} ${process.getSystemVersion?.() ?? ''} ${process.arch}`.trim(),
+    plan: licenseStatus().state
+  }
+  try {
+    const res = await net.fetch(CONFIG.feedbackUrl, { method: 'POST', headers: { 'content-type': 'application/json', 'x-ilf-app': app.getVersion() }, body: JSON.stringify(body) })
+    if (res.ok) return { ok: true }
+    return { ok: false, error: res.status === 429 ? 'That’s a lot of messages at once. Try again in a minute.' : 'Couldn’t send it right now.' }
+  } catch {
+    return { ok: false, error: 'You seem to be offline.' }
+  }
+})
 
 ipcMain.handle('update:state', () => updateState())
 ipcMain.handle('update:check', () => checkForUpdates(true))

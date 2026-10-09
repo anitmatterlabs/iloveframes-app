@@ -1,53 +1,48 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { AnimatePresence, motion } from 'framer-motion'
-import { BadgeCheck, Clock, Download, KeyRound, Loader2, LogOut, RefreshCw, ShieldCheck, Sparkles, User, X } from 'lucide-react'
+import { BadgeCheck, BookOpen, Check, Clock, Download, KeyRound, LifeBuoy, Loader2, LogOut, MessageSquareHeart, Monitor, Pencil, PlayCircle, RefreshCw, ShieldCheck, Sparkles, X } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { LogoMark } from '@/components/Brand'
 import { cn } from '@/lib/utils'
 import { fmtRemaining, useLicense, useTrialRemaining } from '@/lib/license'
+import { ProBadge, SITE, SUPPORT_EMAIL, celebrate, initials } from './Pro'
+import { openFeedback } from './Feedback'
+import { replayTour } from './Tour'
 
-/** Name + license key form, shared by the Account page and the lock screen. */
+/** License key form, shared by the Account page and the lock screen. */
 function ActivateForm({ compact }: { compact?: boolean }) {
   const st = useLicense()
-  const [name, setName] = useState('')
   const [key, setKey] = useState('')
   const [busy, setBusy] = useState(false)
   const [err, setErr] = useState<string | null>(null)
-  useEffect(() => {
-    if (st?.name && !name) setName(st.name)
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [st?.name])
   const go = async () => {
     setBusy(true)
     setErr(null)
-    const r = await window.ilf.license.activate(key, name)
+    const r = await window.ilf.license.activate(key, st?.name ?? '')
     setBusy(false)
     if (!r.ok) setErr(r.error)
-    else setKey('')
+    else {
+      // only after Dodo has confirmed the key
+      setKey('')
+      celebrate()
+    }
   }
   return (
     <div className="space-y-3">
-      <label className="block">
-        <span className="mb-1.5 block text-[11.5px] font-medium text-zinc-400">Your name</span>
-        <div className="flex h-10 items-center gap-2 rounded-xl border border-white/[0.08] bg-black/30 px-3 focus-within:border-brand-orchid/60">
-          <User className="h-4 w-4 text-zinc-500" />
-          <input value={name} onChange={(e) => setName(e.target.value)} placeholder="Abhinay" className="h-full flex-1 bg-transparent text-[13px] text-white outline-none placeholder:text-zinc-600" />
-        </div>
-      </label>
-      <label className="block">
-        <span className="mb-1.5 block text-[11.5px] font-medium text-zinc-400">License key</span>
-        <div className="flex h-10 items-center gap-2 rounded-xl border border-white/[0.08] bg-black/30 px-3 focus-within:border-brand-orchid/60">
-          <KeyRound className="h-4 w-4 text-zinc-500" />
-          <input
-            value={key}
-            onChange={(e) => setKey(e.target.value)}
-            onKeyDown={(e) => e.key === 'Enter' && key && !busy && go()}
-            placeholder="Paste the key from your email"
-            spellCheck={false}
-            className="h-full flex-1 bg-transparent font-mono text-[12.5px] tracking-wide text-white outline-none placeholder:font-sans placeholder:tracking-normal placeholder:text-zinc-600"
-          />
-        </div>
-      </label>
+      <div className={cn('flex items-center gap-2 rounded-xl border bg-black/30 px-3 transition-colors focus-within:border-brand-orchid/60', compact ? 'h-10' : 'h-11', err ? 'border-red-500/30' : 'border-white/[0.08]')}>
+        <KeyRound className="h-4 w-4 shrink-0 text-zinc-500" />
+        <input
+          value={key}
+          onChange={(e) => {
+            setKey(e.target.value)
+            setErr(null)
+          }}
+          onKeyDown={(e) => e.key === 'Enter' && key.trim() && !busy && go()}
+          placeholder="Paste your license key"
+          spellCheck={false}
+          className="h-full min-w-0 flex-1 bg-transparent font-mono text-[12.5px] tracking-wide text-white outline-none placeholder:font-sans placeholder:tracking-normal placeholder:text-zinc-600"
+        />
+      </div>
       <AnimatePresence>
         {err && (
           <motion.div initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: 'auto' }} exit={{ opacity: 0, height: 0 }} className="overflow-hidden rounded-lg border border-red-500/20 bg-red-500/[0.07] px-3 py-2 text-[12px] leading-snug text-red-300">
@@ -56,11 +51,247 @@ function ActivateForm({ compact }: { compact?: boolean }) {
         )}
       </AnimatePresence>
       <Button variant="primary" className={cn('w-full', compact ? 'h-10' : 'h-11')} disabled={!key.trim() || busy} onClick={go}>
-        {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : <ShieldCheck className="h-4 w-4" />} {busy ? 'Activating…' : 'Activate license'}
+        {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : <ShieldCheck className="h-4 w-4" />} {busy ? 'Checking your key…' : 'Activate Pro'}
       </Button>
-      <div className="flex items-center justify-between text-[11.5px] text-zinc-500">
-        <span className="pr-3">Bought already? Your key was emailed by Dodo Payments.</span>
-        <button onClick={() => window.ilf.license.buy()} className="shrink-0 whitespace-nowrap font-medium text-brand-lilac hover:text-white">Buy a license</button>
+      <div className="flex items-center justify-between gap-3 text-[11.5px] text-zinc-500">
+        <span>Your key arrives by email right after purchase.</span>
+        <button onClick={() => window.ilf.license.buy()} className="shrink-0 whitespace-nowrap font-medium text-brand-lilac transition-colors hover:text-white">
+          Get lifetime · <s className="text-zinc-600">$24</s> $12
+        </button>
+      </div>
+    </div>
+  )
+}
+
+/** Circular trial meter. */
+function TrialRing({ remaining, expired }: { remaining: number; expired: boolean }) {
+  const pct = Math.min(1, remaining / (24 * 3600 * 1000))
+  const R = 42
+  const C = 2 * Math.PI * R
+  return (
+    <div className="relative h-[124px] w-[124px] shrink-0">
+      <svg viewBox="0 0 100 100" className="h-full w-full -rotate-90">
+        <defs>
+          <linearGradient id="trg" x1="0" x2="1" y1="0" y2="1">
+            <stop stopColor="#ff4d8d" />
+            <stop offset=".55" stopColor="#c084fc" />
+            <stop offset="1" stopColor="#8b5cf6" />
+          </linearGradient>
+        </defs>
+        <circle cx="50" cy="50" r={R} stroke="rgba(255,255,255,.06)" strokeWidth="6" fill="none" />
+        <circle cx="50" cy="50" r={R} stroke="url(#trg)" strokeWidth="6" fill="none" strokeLinecap="round" strokeDasharray={C} strokeDashoffset={C * (1 - pct)} className="transition-[stroke-dashoffset] duration-1000" />
+      </svg>
+      <div className="absolute inset-0 grid place-items-center text-center">
+        <div>
+          <div className="text-[20px] font-semibold tabular-nums tracking-tight text-white">{expired ? '0h' : fmtRemaining(remaining)}</div>
+          <div className="text-[10.5px] text-zinc-500">{expired ? 'trial ended' : 'left in trial'}</div>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+function ago(t: number) {
+  const s = Math.max(0, (Date.now() - t) / 1000)
+  if (s < 90) return 'just now'
+  if (s < 3600) return `${Math.round(s / 60)} min ago`
+  if (s < 86400) return `${Math.round(s / 3600)} h ago`
+  return `${Math.round(s / 86400)} days ago`
+}
+
+function Card({ children, className }: { children: React.ReactNode; className?: string }) {
+  return <div className={cn('rounded-[22px] border border-white/[0.07] bg-white/[0.02] p-5', className)}>{children}</div>
+}
+
+/** Inline-editable display name: the one place the name is set. */
+function NameField({ value }: { value: string }) {
+  const [editing, setEditing] = useState(false)
+  const [v, setV] = useState(value)
+  const ref = useRef<HTMLInputElement>(null)
+  useEffect(() => setV(value), [value])
+  useEffect(() => {
+    if (editing) ref.current?.select()
+  }, [editing])
+  const save = () => {
+    setEditing(false)
+    if (v.trim() !== value) window.ilf.license.setName(v.trim())
+  }
+  if (editing)
+    return (
+      <input
+        ref={ref}
+        value={v}
+        maxLength={60}
+        onChange={(e) => setV(e.target.value)}
+        onBlur={save}
+        onKeyDown={(e) => {
+          if (e.key === 'Enter') save()
+          if (e.key === 'Escape') {
+            setV(value)
+            setEditing(false)
+          }
+        }}
+        placeholder="Your name"
+        className="-ml-1.5 w-full max-w-[320px] rounded-lg border border-brand-orchid/50 bg-black/30 px-1.5 text-[22px] font-semibold tracking-[-0.02em] text-white outline-none"
+      />
+    )
+  return (
+    <button onClick={() => setEditing(true)} className="group/name -ml-1.5 flex items-center gap-2 rounded-lg px-1.5 text-left transition-colors hover:bg-white/[0.04]" title="Edit your name">
+      <span className={cn('text-[22px] font-semibold tracking-[-0.02em]', value ? 'text-white' : 'text-zinc-500')}>{value || 'Add your name'}</span>
+      <Pencil className="h-3.5 w-3.5 text-zinc-600 transition-colors group-hover/name:text-zinc-300" />
+    </button>
+  )
+}
+
+/** Account page: who you are, your plan, help, updates. */
+export function AccountPanel() {
+  const st = useLicense()
+  const remaining = useTrialRemaining()
+  const [confirm, setConfirm] = useState(false)
+  const [deact, setDeact] = useState<string | null>(null)
+  const [busy, setBusy] = useState(false)
+  const [ver, setVer] = useState('')
+  useEffect(() => {
+    window.ilf.updates.version().then(setVer)
+  }, [])
+  if (!st) return null
+  const pro = st.state === 'licensed' && !!st.license
+  const name = st.name || st.license?.customerName || ''
+  const help = [
+    { icon: PlayCircle, label: 'Replay walkthrough', hint: 'A 30-second tour of the app', tint: 'text-brand-lilac', run: () => { location.hash = '/'; setTimeout(() => replayTour('home'), 450) } },
+    { icon: MessageSquareHeart, label: 'Send feedback', hint: 'Ideas, bugs, love notes', tint: 'text-brand-rose', run: () => openFeedback() },
+    { icon: LifeBuoy, label: 'Contact support', hint: SUPPORT_EMAIL, tint: 'text-zinc-300', run: () => window.open(`mailto:${SUPPORT_EMAIL}?subject=iloveframes%20help`) },
+    { icon: BookOpen, label: 'Setup guide', hint: 'Installing on another computer', tint: 'text-zinc-300', run: () => window.open(`${SITE}/download/`) }
+  ]
+  return (
+    <div className="mx-auto w-full max-w-[720px] space-y-4">
+      {/* identity */}
+      <div className="relative overflow-hidden rounded-[26px] border border-white/[0.08] bg-[#0f0f15] p-6">
+        <div className="account-aurora pointer-events-none absolute inset-0" />
+        <div className="relative flex items-center gap-5">
+          <div className={cn('orb relative grid h-[72px] w-[72px] shrink-0 place-items-center rounded-full', pro && 'orb-pro')}>
+            <span className="grid h-full w-full place-items-center rounded-full bg-ink-800 text-[24px] font-semibold text-white">{initials(name) || <LogoMark className="h-9 w-9" />}</span>
+            {pro && (
+              <span className="absolute -bottom-0.5 -right-0.5 grid h-6 w-6 place-items-center rounded-full bg-brand ring-[3px] ring-[#0f0f15]">
+                <Check className="h-3 w-3 text-white" strokeWidth={4} />
+              </span>
+            )}
+          </div>
+          <div className="min-w-0 flex-1">
+            <NameField value={name} />
+            <div className="mt-1.5 flex flex-wrap items-center gap-2 text-[12.5px] text-zinc-400">
+              {pro ? (
+                <>
+                  <ProBadge />
+                  <span>Lifetime license{st.license?.customerEmail ? ` · ${st.license.customerEmail}` : ''}</span>
+                </>
+              ) : st.state === 'trial' ? (
+                <>
+                  <span className="flex items-center gap-1.5 rounded-full border border-white/10 bg-white/[0.04] px-2 py-0.5 text-[11px] font-medium text-zinc-300">
+                    <Clock className="h-3 w-3 text-brand-lilac" /> Free trial
+                  </span>
+                  <span>{fmtRemaining(remaining)} left</span>
+                </>
+              ) : (
+                <span className="text-red-300">Trial ended. Activate to keep creating.</span>
+              )}
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* plan */}
+      {pro ? (
+        <div className="pro-card relative overflow-hidden rounded-[22px] p-5">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <div className="grid h-10 w-10 place-items-center rounded-xl bg-brand text-white shadow-glow"><BadgeCheck className="h-5 w-5" /></div>
+              <div>
+                <div className="text-[15px] font-semibold text-white">iloveframes Pro</div>
+                <div className="text-[12px] text-zinc-400">Every feature, every future update. Yours for life.</div>
+              </div>
+            </div>
+            <Sparkles className="h-4 w-4 text-brand-lilac/70" />
+          </div>
+          <div className="mt-5 grid grid-cols-3 gap-2.5 text-[12px]">
+            {[
+              ['License key', <span className="font-mono">{st.license!.keyMasked}</span>],
+              ['Activated', new Date(st.license!.activatedAt).toLocaleDateString(undefined, { day: 'numeric', month: 'short', year: 'numeric' })],
+              ['Verified', ago(st.license!.lastValidated)]
+            ].map(([k, v]) => (
+              <div key={k as string} className="rounded-xl bg-black/30 px-3 py-2.5 ring-1 ring-white/[0.05]">
+                <div className="text-zinc-500">{k}</div>
+                <div className="mt-0.5 truncate text-zinc-100">{v}</div>
+              </div>
+            ))}
+          </div>
+          <div className="mt-4 flex min-h-[36px] items-center justify-between gap-3 border-t border-white/[0.06] pt-4">
+            <AnimatePresence mode="wait" initial={false}>
+              {confirm ? (
+                <motion.div key="c" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="flex w-full items-center justify-between gap-3">
+                  <span className="text-[12px] text-zinc-300">Free this computer? You can activate again anytime.</span>
+                  <div className="flex shrink-0 gap-2">
+                    <Button variant="ghost" size="sm" onClick={() => setConfirm(false)}>Cancel</Button>
+                    <Button
+                      variant="danger"
+                      size="sm"
+                      disabled={busy}
+                      onClick={async () => {
+                        setBusy(true)
+                        const r = await window.ilf.license.deactivate()
+                        setBusy(false)
+                        setConfirm(false)
+                        setDeact(r.ok ? null : r.error)
+                      }}
+                    >
+                      {busy ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <LogOut className="h-3.5 w-3.5" />} Deactivate
+                    </Button>
+                  </div>
+                </motion.div>
+              ) : (
+                <motion.div key="n" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="flex w-full items-center justify-between gap-3">
+                  <span className="flex items-center gap-2 text-[12px] text-zinc-500"><Monitor className="h-3.5 w-3.5" /> Active on this computer · up to 3 allowed</span>
+                  <Button variant="ghost" size="sm" onClick={() => setConfirm(true)}><LogOut className="h-3.5 w-3.5" /> Deactivate</Button>
+                </motion.div>
+              )}
+            </AnimatePresence>
+          </div>
+          {deact && <div className="mt-2 text-[12px] text-red-300">{deact}</div>}
+        </div>
+      ) : (
+        <Card className="p-6">
+          <div className="flex items-center gap-6">
+            <TrialRing remaining={remaining} expired={st.state === 'expired'} />
+            <div className="min-w-0 flex-1">
+              <div className="text-[15px] font-semibold text-white">Unlock iloveframes Pro</div>
+              <div className="mb-4 mt-0.5 text-[12.5px] text-zinc-400">One payment, yours forever. Paste the key from your email.</div>
+              <ActivateForm />
+            </div>
+          </div>
+        </Card>
+      )}
+
+      {/* help */}
+      <Card>
+        <div className="mb-3 text-[13px] font-semibold text-white">Help &amp; feedback</div>
+        <div className="grid grid-cols-2 gap-2">
+          {help.map((h) => (
+            <button key={h.label} onClick={h.run} className="group flex items-center gap-3 rounded-2xl border border-white/[0.06] bg-white/[0.02] p-3 text-left transition-all hover:-translate-y-px hover:border-white/15 hover:bg-white/[0.04]">
+              <span className="grid h-9 w-9 shrink-0 place-items-center rounded-xl bg-white/[0.05] ring-1 ring-white/[0.06]"><h.icon className={cn('h-4 w-4', h.tint)} /></span>
+              <span className="min-w-0">
+                <span className="block text-[12.5px] font-medium text-zinc-100">{h.label}</span>
+                <span className="block truncate text-[11px] text-zinc-500">{h.hint}</span>
+              </span>
+            </button>
+          ))}
+        </div>
+      </Card>
+
+      <UpdatesCard />
+
+      <div className="pt-2 text-center text-[11px] text-zinc-600">
+        iloveframes {ver} · made with love ·{' '}
+        <button className="underline-offset-2 hover:text-zinc-300 hover:underline" onClick={() => window.open(SITE)}>iloveframes.app</button>
       </div>
     </div>
   )
@@ -86,7 +317,7 @@ function UpdatesCard() {
     : st.kind === 'error' ? st.message
     : 'Updates install automatically in the background.'
   return (
-    <div className="rounded-2xl border border-white/[0.07] bg-white/[0.02] p-5">
+    <div className="rounded-[22px] border border-white/[0.07] bg-white/[0.02] p-5">
       <div className="flex items-center justify-between">
         <div>
           <div className="text-[13px] font-semibold text-white">Updates</div>
@@ -102,108 +333,6 @@ function UpdatesCard() {
           </Button>
         )}
       </div>
-    </div>
-  )
-}
-
-/** Account page: plan status, licence activation / deactivation, name, updates. */
-export function AccountPanel({ onClose }: { onClose?: () => void }) {
-  const st = useLicense()
-  const remaining = useTrialRemaining()
-  const [name, setName] = useState('')
-  const [deact, setDeact] = useState<string | null>(null)
-  const [busy, setBusy] = useState(false)
-  useEffect(() => setName(st?.name ?? ''), [st?.name])
-  if (!st) return null
-  const pct = Math.min(1, remaining / (24 * 3600 * 1000))
-  return (
-    <div className="mx-auto w-full max-w-[560px] space-y-4">
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-[22px] font-semibold tracking-[-0.02em] text-white">Account</h1>
-          <p className="mt-0.5 text-[12.5px] text-zinc-500">Your plan, license and updates.</p>
-        </div>
-        {onClose && (
-          <button onClick={onClose} className="grid h-8 w-8 place-items-center rounded-lg text-zinc-500 hover:bg-white/10 hover:text-white">
-            <X className="h-4 w-4" />
-          </button>
-        )}
-      </div>
-
-      {st.state === 'licensed' && st.license ? (
-        <div className="relative overflow-hidden rounded-2xl border border-brand-orchid/25 bg-gradient-to-br from-brand-pink/[0.10] via-brand-orchid/[0.07] to-brand-violet/[0.10] p-5">
-          <div className="flex items-center gap-3">
-            <div className="grid h-10 w-10 place-items-center rounded-xl bg-brand text-white"><BadgeCheck className="h-5 w-5" /></div>
-            <div>
-              <div className="text-[15px] font-semibold text-white">iloveframes Pro</div>
-              <div className="text-[12px] text-zinc-400">Licensed to {st.license.customerName || st.name || 'you'}{st.license.customerEmail ? ' · ' + st.license.customerEmail : ''}</div>
-            </div>
-          </div>
-          <div className="mt-4 grid grid-cols-2 gap-3 text-[12px]">
-            <div className="rounded-xl bg-black/25 px-3 py-2.5">
-              <div className="text-zinc-500">License key</div>
-              <div className="mt-0.5 font-mono text-zinc-200">{st.license.keyMasked}</div>
-            </div>
-            <div className="rounded-xl bg-black/25 px-3 py-2.5">
-              <div className="text-zinc-500">Activated</div>
-              <div className="mt-0.5 text-zinc-200">{new Date(st.license.activatedAt).toLocaleDateString(undefined, { day: 'numeric', month: 'short', year: 'numeric' })}</div>
-            </div>
-          </div>
-          <div className="mt-4 flex items-center justify-between">
-            <span className="text-[11.5px] text-zinc-500">Moving to a new computer? Free this device first.</span>
-            <Button
-              variant="ghost"
-              size="sm"
-              disabled={busy}
-              onClick={async () => {
-                setBusy(true)
-                const r = await window.ilf.license.deactivate()
-                setBusy(false)
-                setDeact(r.ok ? null : r.error)
-              }}
-            >
-              <LogOut className="h-3.5 w-3.5" /> Deactivate
-            </Button>
-          </div>
-          {deact && <div className="mt-2 text-[12px] text-red-300">{deact}</div>}
-        </div>
-      ) : (
-        <div className="rounded-2xl border border-white/[0.07] bg-white/[0.02] p-5">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-2.5">
-              <div className={cn('grid h-9 w-9 place-items-center rounded-xl', st.state === 'trial' ? 'bg-brand-orchid/15 text-brand-lilac' : 'bg-red-500/15 text-red-300')}>
-                <Clock className="h-4 w-4" />
-              </div>
-              <div>
-                <div className="text-[13.5px] font-semibold text-white">{st.state === 'trial' ? 'Free trial' : 'Trial ended'}</div>
-                <div className="text-[12px] text-zinc-500">{st.state === 'trial' ? `${fmtRemaining(remaining)} left of your 24-hour trial` : 'Activate a license to keep recording and exporting.'}</div>
-              </div>
-            </div>
-            <Sparkles className="h-4 w-4 text-brand-lilac/70" />
-          </div>
-          {st.state === 'trial' && (
-            <div className="mt-4 h-1.5 overflow-hidden rounded-full bg-white/[0.06]">
-              <div className="bg-brand h-full rounded-full transition-[width] duration-1000" style={{ width: pct * 100 + '%' }} />
-            </div>
-          )}
-          <div className="mt-5 border-t border-white/[0.06] pt-5">
-            <ActivateForm />
-          </div>
-        </div>
-      )}
-
-      <div className="rounded-2xl border border-white/[0.07] bg-white/[0.02] p-5">
-        <div className="text-[13px] font-semibold text-white">Profile</div>
-        <div className="mt-3 flex items-center gap-2">
-          <div className="flex h-9 flex-1 items-center gap-2 rounded-xl border border-white/[0.08] bg-black/30 px-3 focus-within:border-brand-orchid/60">
-            <User className="h-4 w-4 text-zinc-500" />
-            <input value={name} onChange={(e) => setName(e.target.value)} placeholder="Your name" className="h-full flex-1 bg-transparent text-[13px] text-white outline-none placeholder:text-zinc-600" />
-          </div>
-          <Button variant="secondary" size="sm" disabled={name.trim() === (st.name ?? '')} onClick={() => window.ilf.license.setName(name)}>Save</Button>
-        </div>
-      </div>
-
-      <UpdatesCard />
     </div>
   )
 }
@@ -230,22 +359,14 @@ export function LicenseGate() {
   )
 }
 
-/** Small title-bar badge: trial countdown or Pro. Opens the Account page. */
+/** Small title-bar badge with the trial countdown (Pro shows on the avatar instead). Opens Account. */
 export function AccountBadge({ onClick }: { onClick: () => void }) {
   const st = useLicense()
   const remaining = useTrialRemaining()
-  if (!st) return null
+  if (!st || st.state === 'licensed') return null
   return (
     <button onClick={onClick} className="no-drag flex h-7 items-center gap-1.5 rounded-full border border-white/[0.08] bg-white/[0.04] pl-2 pr-2.5 text-[11.5px] font-medium text-zinc-300 transition-colors hover:border-white/15 hover:bg-white/[0.08] hover:text-white">
-      {st.state === 'licensed' ? (
-        <>
-          <BadgeCheck className="h-3.5 w-3.5 text-brand-lilac" /> Pro
-        </>
-      ) : (
-        <>
-          <Clock className="h-3.5 w-3.5 text-brand-lilac" /> Trial · {fmtRemaining(remaining)} left
-        </>
-      )}
+      <Clock className="h-3.5 w-3.5 text-brand-lilac" /> {st.state === 'trial' ? `Trial · ${fmtRemaining(remaining)} left` : 'Trial ended'}
     </button>
   )
 }

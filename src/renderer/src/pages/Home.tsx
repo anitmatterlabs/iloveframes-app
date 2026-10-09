@@ -15,6 +15,43 @@ import { mediaUrl, type ProjectSummary } from '@/engine/types'
 import { playSfx } from '@/engine/sounds'
 import { navigate } from '@/App'
 import { AccountBadge } from '@/components/Account'
+import { AccountOrb, HelpMenu, ProTag } from '@/components/Pro'
+import { useFirstRunTour } from '@/components/Tour'
+import { useLicense } from '@/lib/license'
+
+const TIPS = [
+  'Press S in the editor to split a clip at the playhead.',
+  'Double-click the zoom lane to add a zoom anywhere.',
+  'Drop an old iloveframes recording into a project: its smart zooms come along.',
+  'Click the round button between two clips to add a transition.',
+  'Paste a screenshot with Ctrl+V in Screenshot Studio to beautify it.',
+  'Space plays and pauses the preview.',
+  'Export a GIF for READMEs and help docs.'
+]
+
+function greeting(d = new Date()) {
+  const h = d.getHours()
+  return h < 5 ? 'Working late' : h < 12 ? 'Good morning' : h < 17 ? 'Good afternoon' : h < 22 ? 'Good evening' : 'Working late'
+}
+
+/** A gentle rotating tip: one line, fades between hints. */
+function Tips() {
+  const [i, setI] = useState(() => Math.floor(Math.random() * TIPS.length))
+  useEffect(() => {
+    const t = setInterval(() => setI((n) => (n + 1) % TIPS.length), 7000)
+    return () => clearInterval(t)
+  }, [])
+  return (
+    <div className="flex h-5 items-center gap-2 text-[11.5px] text-zinc-500">
+      <Sparkles className="h-3.5 w-3.5 shrink-0 text-brand-lilac/70" />
+      <AnimatePresence mode="wait">
+        <motion.span key={i} initial={{ opacity: 0, y: 4 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -4 }} transition={{ duration: 0.35 }} className="truncate">
+          {TIPS[i]}
+        </motion.span>
+      </AnimatePresence>
+    </div>
+  )
+}
 
 interface DisplayInfo { id: string; name: string; width: number; height: number; primary: boolean; thumbnail: string | null }
 
@@ -247,16 +284,51 @@ export default function Home() {
   }
 
   const needsPerms = perms && (perms.screen !== 'granted' || !perms.accessibility)
+  const lic = useLicense()
+  const firstName = (lic?.name || lic?.license?.customerName || '').split(' ')[0]
+  const [hello, setHello] = useState(() => greeting())
+  useEffect(() => {
+    const t = setInterval(() => setHello(greeting()), 60_000)
+    return () => clearInterval(t)
+  }, [])
+
+  // a near-live preview of the screens while you're on Home
+  useEffect(() => {
+    if (phase !== 'idle') return
+    let busy = false
+    const t = setInterval(async () => {
+      if (busy || document.visibilityState !== 'visible' || !document.hasFocus()) return
+      busy = true
+      try {
+        const thumbs = await window.ilf.displayThumbs()
+        const next = cache.displays.map((x) => ({ ...x, thumbnail: thumbs[x.id] ?? x.thumbnail }))
+        cache.displays = next
+        setDisplays(next)
+      } finally {
+        busy = false
+      }
+    }, 2500)
+    return () => clearInterval(t)
+  }, [phase])
+
+  // first launch: a short, skippable tour once the screen is ready
+  useFirstRunTour('home', phase === 'idle' && displays.length > 0 && !!lic && lic.state !== 'expired')
 
   return (
     <div className="relative flex h-full flex-col overflow-hidden bg-ink-950">
-      <div className="pointer-events-none absolute -top-48 left-1/2 h-[520px] w-[980px] -translate-x-1/2 rounded-full bg-[radial-gradient(closest-side,rgba(255,77,141,.12),transparent)]" />
-      <div className="pointer-events-none absolute -top-24 right-0 h-[420px] w-[620px] rounded-full bg-[radial-gradient(closest-side,rgba(139,92,246,.11),transparent)]" />
+      <div className="pointer-events-none absolute -top-48 left-1/2 h-[520px] w-[980px] -translate-x-1/2">
+        <div className="aurora-a h-full w-full rounded-full bg-[radial-gradient(closest-side,rgba(255,77,141,.13),transparent)]" />
+      </div>
+      <div className="aurora-b pointer-events-none absolute -top-24 right-0 h-[420px] w-[620px] rounded-full bg-[radial-gradient(closest-side,rgba(139,92,246,.12),transparent)]" />
+      <div className="aurora-a pointer-events-none absolute -bottom-40 -left-24 h-[380px] w-[560px] rounded-full bg-[radial-gradient(closest-side,rgba(192,132,252,.06),transparent)]" />
       <Titlebar>
-        <LogoMark className="h-[22px] w-[22px]" />
+        <span className="logo-beat inline-flex"><LogoMark className="h-[22px] w-[22px]" /></span>
         <Wordmark className="text-[14px]" />
+        <ProTag className="-ml-1" />
         <div className="flex-1" />
         <AccountBadge onClick={() => navigate('/account')} />
+        <HelpMenu tour="home" />
+        <AccountOrb onClick={() => navigate('/account')} />
         <Tip content="Open recordings folder" side="bottom">
           <Button variant="ghost" size="icon-sm" className="no-drag" onClick={async () => window.ilf.open((await window.ilf.info()).projectsDir)}>
             <FolderOpen className="h-4 w-4" />
@@ -269,6 +341,13 @@ export default function Home() {
           {/* header */}
           <motion.div initial={firstVisit ? { opacity: 0, y: 8 } : false} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.5, ease: [0.2, 0.8, 0.2, 1] }} className="flex items-end justify-between gap-6">
             <div className="min-w-0">
+              <div className="mb-2 flex items-center gap-2 text-[12px] text-zinc-500">
+                <span className="relative flex h-2 w-2">
+                  <span className="absolute inset-0 animate-ping rounded-full bg-brand-pink/60 [animation-duration:2.4s]" />
+                  <span className="relative h-2 w-2 rounded-full bg-brand-pink" />
+                </span>
+                {hello}{firstName ? `, ${firstName}` : ''}. Ready when you are.
+              </div>
               <h1 className="text-[26px] font-semibold leading-tight tracking-[-0.03em] text-white">
                 Record a walkthrough <span className="text-gradient">people actually watch.</span>
               </h1>
@@ -304,7 +383,7 @@ export default function Home() {
           {/* recording setup: screen on the left, options on the right */}
           <div className="glass overflow-hidden rounded-2xl">
             <div className="grid grid-cols-[minmax(0,0.85fr)_minmax(0,1fr)]">
-              <div className="border-r border-white/[0.05] p-5">
+              <div data-tour="screen" className="border-r border-white/[0.05] p-5">
                 <div className="mb-3 flex items-center justify-between">
                   <div className="flex items-center gap-2 text-[12.5px] font-medium text-zinc-200">
                     <Monitor className="h-4 w-4 text-zinc-500" /> Screen
@@ -324,6 +403,11 @@ export default function Home() {
                       >
                         <div className="checker relative aspect-video overflow-hidden rounded-lg">
                           {d.thumbnail ? <img src={d.thumbnail} className="h-full w-full object-cover" /> : <div className="grid h-full place-items-center text-zinc-600"><Monitor className="h-5 w-5" /></div>}
+                          {sel && phase === 'idle' && (
+                            <div className="absolute left-1.5 top-1.5 flex items-center gap-1 rounded-full bg-black/55 px-1.5 py-0.5 text-[9px] font-semibold tracking-[.12em] text-white/90 backdrop-blur">
+                              <span className="live-dot h-1.5 w-1.5 rounded-full bg-brand-pink" /> LIVE
+                            </div>
+                          )}
                           {sel && displays.length > 1 && (
                             <div className="absolute right-1.5 top-1.5 grid h-5 w-5 place-items-center rounded-full bg-brand shadow-lg"><Check className="h-3 w-3 text-white" strokeWidth={3} /></div>
                           )}
@@ -339,6 +423,7 @@ export default function Home() {
               </div>
 
               <div className="flex flex-col divide-y divide-white/[0.05]">
+                <div data-tour="devices" className="divide-y divide-white/[0.05]">
                 {/* camera */}
                 <div className="px-5 py-4">
                   <div className="flex items-center gap-3">
@@ -389,8 +474,9 @@ export default function Home() {
                     )}
                   </AnimatePresence>
                 </div>
+                </div>
                 {/* mode */}
-                <div className="px-5 py-4">
+                <div data-tour="mode" className="px-5 py-4">
                   <div className="mb-3 flex items-center gap-3">
                     <div className="grid h-8 w-8 shrink-0 place-items-center rounded-lg bg-white/[0.05] text-zinc-400"><Wand2 className="h-4 w-4" /></div>
                     <div className="min-w-0">
@@ -414,7 +500,7 @@ export default function Home() {
                 Stop anytime
                 <div className="mt-0.5 font-medium text-zinc-400">{modKey} + Shift + 2</div>
               </div>
-              <Button variant="record" size="lg" onClick={start} disabled={!displayId || phase !== 'idle'} className="min-w-[190px]">
+              <Button data-tour="record" variant="record" size="lg" onClick={start} disabled={!displayId || phase !== 'idle'} className={cn('min-w-[190px]', phase === 'idle' && displayId && 'breathe')}>
                 <span className="relative flex h-3 w-3">
                   <span className="absolute inset-0 animate-pulse-ring rounded-full bg-white/70" />
                   <span className="relative h-3 w-3 rounded-full bg-white" />
@@ -438,7 +524,7 @@ export default function Home() {
                 <Film className="h-4 w-4 text-zinc-600" /> Your recordings will show up here, ready to edit and export.
               </div>
             ) : (
-              <div className="-mx-1 flex gap-3 overflow-x-auto px-1 pb-2">
+              <div data-tour="recent" className="-mx-1 flex gap-3 overflow-x-auto px-1 pb-2">
                 {projects.map((p, i) => (
                   <motion.div
                     key={p.id}
@@ -478,6 +564,7 @@ export default function Home() {
               </div>
             )}
           </section>
+          <Tips />
         </div>
       </main>
 

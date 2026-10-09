@@ -76,6 +76,7 @@ const api = {
     import: (paths?: string[]): Promise<{ id: string; name: string; file: string; duration: number }[]> => ipcRenderer.invoke('sounds:import', paths),
     remove: (id: string) => ipcRenderer.invoke('sounds:remove', id)
   },
+  feedback: (f: { kind: string; message: string; email: string; name: string }): Promise<{ ok: true } | { ok: false; error: string }> => ipcRenderer.invoke('feedback:send', f),
   pathForFile: (f: File) => webUtils.getPathForFile(f),
   wallpapers: {
     list: (): Promise<{ id: string; name: string; group: string; file: string; thumb: string; width: number; height: number }[]> => ipcRenderer.invoke('wallpapers:list'),

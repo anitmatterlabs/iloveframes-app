@@ -14,6 +14,8 @@ import { autoZoomSegments } from '@/engine/motion'
 import { cn, fmtTime, modKey } from '@/lib/utils'
 import { seqDuration } from '@/engine/sequence'
 import { AccountBadge } from '@/components/Account'
+import { AccountOrb, HelpMenu } from '@/components/Pro'
+import { useFirstRunTour } from '@/components/Tour'
 import { navigate } from '@/App'
 
 function ToolBtn({ tip, onClick, disabled, children, active }: { tip: string; onClick: () => void; disabled?: boolean; children: React.ReactNode; active?: boolean }) {
@@ -210,6 +212,9 @@ export default function Editor({ id }: { id: string }) {
     }
   }, [])
 
+  // first time in the editor: a four-card tour once the project is on screen
+  useFirstRunTour('editor', !!project && !!edit)
+
   if (error)
     return (
       <div className="grid h-full place-items-center bg-ink-950 text-center">
@@ -246,6 +251,8 @@ export default function Editor({ id }: { id: string }) {
         <div className="flex-1" />
         <div className="no-drag flex items-center gap-1">
           <AccountBadge onClick={() => { player.pause(); navigate('/account') }} />
+          <HelpMenu tour="editor" />
+          <AccountOrb onClick={() => { player.pause(); navigate('/account') }} />
           <div className="mx-1 h-4 w-px bg-white/10" />
           <Tip content={`Undo (${modKey}+Z)`} side="bottom">
             <Button variant="ghost" size="icon-sm" disabled={!canUndo} onClick={() => useEditor.getState().undo()}><Undo2 className="h-4 w-4" /></Button>
@@ -253,7 +260,7 @@ export default function Editor({ id }: { id: string }) {
           <Tip content={`Redo (${modKey}+Shift+Z)`} side="bottom">
             <Button variant="ghost" size="icon-sm" disabled={!canRedo} onClick={() => useEditor.getState().redo()}><Redo2 className="h-4 w-4" /></Button>
           </Tip>
-          <Button variant="primary" size="sm" className="ml-2" onClick={() => setExportOpen(true)}>
+          <Button data-tour="export" variant="primary" size="sm" className="ml-2" onClick={() => setExportOpen(true)}>
             <Download className="h-3.5 w-3.5" /> Export
           </Button>
         </div>
@@ -261,16 +268,16 @@ export default function Editor({ id }: { id: string }) {
 
       <div className="flex min-h-0 flex-1">
         <div className="flex min-w-0 flex-1 flex-col">
-          <motion.div initial={{ opacity: 0, scale: 0.985 }} animate={{ opacity: 1, scale: 1 }} transition={{ duration: 0.4, ease: [0.2, 0.8, 0.2, 1] }} className="relative min-h-0 flex-1 px-8 pt-6">
+          <motion.div initial={{ opacity: 0, scale: 0.985 }} animate={{ opacity: 1, scale: 1 }} transition={{ duration: 0.4, ease: [0.2, 0.8, 0.2, 1] }} data-tour="preview" className="relative min-h-0 flex-1 px-8 pt-6">
             <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(ellipse_at_center,rgba(139,92,246,.06),transparent_60%)]" />
             <Preview />
           </motion.div>
           <Transport onToast={flash} />
-          <div className="h-[290px] shrink-0">
+          <div data-tour="timeline" className="h-[290px] shrink-0">
             <Timeline />
           </div>
         </div>
-        <div className="w-[408px] shrink-0 border-l border-white/[0.05] bg-[#0e0e13]">
+        <div data-tour="inspector" className="w-[408px] shrink-0 border-l border-white/[0.05] bg-[#0e0e13]">
           <Inspector />
         </div>
       </div>

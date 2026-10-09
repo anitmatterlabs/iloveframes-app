@@ -71,3 +71,35 @@ button, a { -webkit-user-drag: none; }
 @keyframes trp-wipe-b { 0%, 20% { clip-path: polygon(0 0, 0 0, -20% 100%, 0 100%) } 70%, 100% { clip-path: polygon(0 0, 120% 0, 100% 100%, 0 100%) } }
 @keyframes trp-dip-a { 0%, 20% { opacity: 1 } 45%, 100% { opacity: 0 } }
 @keyframes trp-dip-b { 0%, 45% { opacity: 0 } 70%, 100% { opacity: 1 } }
+
+/* ---- Pro + account ---- */
+.pro-badge {
+  position: relative; display: inline-flex; align-items: center; height: 18px; padding: 0 7px; border-radius: 6px; overflow: hidden;
+  font-size: 9.5px; font-weight: 800; letter-spacing: .16em; line-height: 1; color: transparent;
+  background: linear-gradient(#141019, #141019) padding-box, linear-gradient(115deg, #ff4d8d, #c084fc 55%, #8b5cf6) border-box;
+  border: 1px solid transparent; box-shadow: 0 0 14px -4px rgba(214, 77, 170, .6);
+}
+.pro-badge::before { content: 'PRO'; position: absolute; inset: 0; display: grid; place-items: center; padding-left: .16em; background: linear-gradient(110deg, #ff7aa8, #d8b4fe 55%, #a78bfa); -webkit-background-clip: text; background-clip: text; color: transparent; }
+.pro-badge::after { content: ''; position: absolute; inset: 0; background: linear-gradient(105deg, transparent 35%, rgba(255,255,255,.55) 50%, transparent 65%); transform: translateX(-120%); animation: sheen 5.5s ease-in-out infinite 1.2s; }
+@keyframes sheen { 0%, 70% { transform: translateX(-120%) } 85%, 100% { transform: translateX(120%) } }
+.orb { padding: 1.5px; background: linear-gradient(140deg, rgba(255,255,255,.22), rgba(255,255,255,.06)); }
+.orb-pro { padding: 2px; background: conic-gradient(from 210deg, #ff4d8d, #c084fc, #8b5cf6, #ff4d8d); box-shadow: 0 0 18px -4px rgba(214, 77, 170, .55); }
+.pro-card { background: linear-gradient(160deg, rgba(255,77,141,.09), rgba(192,132,252,.06) 45%, rgba(124,58,237,.10)) padding-box, linear-gradient(140deg, rgba(255,77,141,.5), rgba(192,132,252,.25) 50%, rgba(124,58,237,.5)) border-box; border: 1px solid transparent; }
+.account-aurora { background: radial-gradient(60% 120% at 0% 0%, rgba(255,77,141,.16), transparent 60%), radial-gradient(60% 120% at 100% 100%, rgba(139,92,246,.18), transparent 60%); animation: drift 18s ease-in-out infinite alternate; }
+
+/* ---- walkthrough ---- */
+.tour-hole { box-shadow: 0 0 0 9999px rgba(5,5,8,.66), 0 0 0 1.5px rgba(192,132,252,.85), 0 0 32px 4px rgba(214,77,170,.35); }
+.tour-kbd { display: inline-block; padding: 0 5px; margin: 0 1px; border-radius: 5px; border: 1px solid rgba(255,255,255,.14); background: rgba(255,255,255,.06); font: 600 11px/17px Inter Variable, system-ui; color: #e4e4e7; }
+
+/* ---- a home that breathes ---- */
+@keyframes drift { 0% { transform: translate3d(0,0,0) scale(1) } 50% { transform: translate3d(3%, 2%, 0) scale(1.06) } 100% { transform: translate3d(-2%, 3%, 0) scale(1.02) } }
+@keyframes drift2 { 0% { transform: translate3d(0,0,0) scale(1) } 50% { transform: translate3d(-4%, 3%, 0) scale(1.08) } 100% { transform: translate3d(2%, -2%, 0) scale(.98) } }
+.aurora-a { animation: drift 22s ease-in-out infinite alternate; will-change: transform; }
+.aurora-b { animation: drift2 28s ease-in-out infinite alternate; will-change: transform; }
+@keyframes breathe { 0%, 100% { box-shadow: 0 10px 40px -8px rgba(255,59,92,.55) } 50% { box-shadow: 0 14px 52px -6px rgba(255,59,92,.85) } }
+.breathe { animation: breathe 3.2s ease-in-out infinite; }
+@keyframes live { 0%, 100% { opacity: 1 } 50% { opacity: .35 } }
+.live-dot { animation: live 1.6s ease-in-out infinite; }
+@keyframes beat { 0%, 100% { transform: scale(1) } 15% { transform: scale(1.12) } 30% { transform: scale(.98) } 45% { transform: scale(1.06) } }
+.logo-beat:hover { animation: beat 1s ease-in-out; }
+@media (prefers-reduced-motion: reduce) { .aurora-a, .aurora-b, .breathe, .live-dot, .account-aurora, .pro-badge::after { animation: none !important; } }

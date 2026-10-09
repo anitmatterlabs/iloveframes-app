@@ -572,3 +572,77 @@ module.exports.lic = async (app, win, out) => {
   await win.waitForTimeout(1500)
   await win.screenshot({ path: path.join(out, `lic-${step}.png`) })
 }
+// Pro polish: first-run tour, account page, activation celebration, feedback, editor tour.
+module.exports.pro = async (app, win, out) => {
+  const shot = (n) => win.screenshot({ path: path.join(out, n + '.png') })
+  await win.evaluate(() => { ['home', 'editor'].forEach((n) => localStorage.removeItem(`ilf.tour.${n}.v1`)); location.hash = '/'; location.reload() })
+  await win.waitForTimeout(3500)
+  // home tour runs on its own
+  for (let k = 0; k < 9; k++) {
+    const card = win.locator('[role=dialog]')
+    if (!(await card.count())) break
+    console.log('TOUR home', k, await card.getAttribute('aria-label'))
+    await shot('tour-home-' + k)
+    await win.getByRole('button', { name: /^(Next|Show me|Done)$/ }).click()
+    await win.waitForTimeout(700)
+  }
+  console.log('home tour seen flag:', await win.evaluate(() => localStorage.getItem('ilf.tour.home.v1')))
+  await win.waitForTimeout(800)
+  await shot('home-alive')
+  // replay + skip from the help menu
+  await win.locator('[data-tour=help]').click()
+  await win.waitForTimeout(400)
+  await shot('help-menu')
+  await win.getByText('Replay walkthrough').click()
+  await win.waitForTimeout(1000)
+  console.log('replay visible:', await win.locator('[role=dialog]').count())
+  await win.getByRole('button', { name: 'Show me' }).click()
+  await win.waitForTimeout(600)
+  await win.getByRole('button', { name: 'Skip' }).click()
+  await win.waitForTimeout(600)
+  console.log('after skip visible:', await win.locator('[role=dialog]').count())
+  // account page (trial)
+  await win.locator('[data-tour=account]').click()
+  await win.waitForTimeout(1200)
+  await shot('account-trial')
+  // feedback sheet through the real path
+  await win.getByText('Send feedback').click()
+  await win.waitForTimeout(500)
+  await win.locator('textarea').fill('UI test from Claude: in-app feedback works end to end. Safe to delete.')
+  await shot('feedback')
+  await win.getByRole('button', { name: /^Send$/ }).click()
+  await win.waitForTimeout(1500)
+  await shot('feedback-sent')
+  await win.waitForTimeout(1500)
+  // real activation against Dodo test mode -> celebration
+  if (process.env.K_MAIN) {
+    await win.locator('input[placeholder="Paste your license key"]').fill(process.env.K_MAIN)
+    await win.getByRole('button', { name: /Activate Pro/ }).click()
+    await win.getByText("You're").first().waitFor({ timeout: 20000 })
+    await win.waitForTimeout(700)
+    await shot('celebrate')
+    await win.getByRole('button', { name: 'Start creating' }).click()
+    await win.waitForTimeout(800)
+    await shot('account-pro')
+    await win.evaluate(() => { location.hash = '/' })
+    await win.waitForTimeout(1500)
+    await shot('home-pro')
+  }
+  // editor tour on an existing project
+  const list = await win.evaluate(() => window.ilf.projects.list())
+  if (list[0]) {
+    await win.evaluate((id) => { location.hash = '/editor/' + encodeURIComponent(id) }, list[0].id)
+    await win.waitForTimeout(4500)
+    for (let k = 0; k < 5; k++) {
+      const card = win.locator('[role=dialog]')
+      if (!(await card.count())) break
+      console.log('TOUR editor', k, await card.getAttribute('aria-label'))
+      await shot('tour-editor-' + k)
+      await win.getByRole('button', { name: /^(Next|Done)$/ }).click()
+      await win.waitForTimeout(700)
+    }
+  }
+  if (process.env.K_MAIN) console.log('DEACTIVATE', JSON.stringify(await win.evaluate(() => window.ilf.license.deactivate())))
+  // leave the first-run tours for the real user
+  await win.evaluate(() => ['home', 'editor'].forEach((n) => localStorage.removeItem(`ilf.tour.${n}.v1`)))
+}

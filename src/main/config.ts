@@ -12,6 +12,9 @@ export const CONFIG = {
   /** Where "Buy a license" sends people (your Dodo checkout / payment link). */
   buyUrl: 'https://iloveframes.app/buy',
 
+  /** In-app feedback is posted here (the website worker forwards it to the inbox). */
+  feedbackUrl: 'https://iloveframes.app/api/feedback',
+
   /** Free trial length from the very first launch. */
   trialMs: 24 * 60 * 60 * 1000,
   /** How long a license keeps working without reaching Dodo (offline grace). */

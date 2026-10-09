@@ -7,6 +7,7 @@ import { Segmented } from '@/components/ui/segmented'
 import { LabeledSlider } from '@/components/ui/slider'
 import { Tip } from '@/components/ui/tooltip'
 import { AccountBadge } from '@/components/Account'
+import { AccountOrb, HelpMenu } from '@/components/Pro'
 import { BackgroundPicker, Section } from '@/editor/Inspector'
 import { defaultShot, drawShot, shotLayout, type ShotSettings } from '@/engine/shot'
 import { loadBgImage } from '@/engine/backgrounds'
@@ -271,6 +272,8 @@ export default function Shot() {
         <div className="flex-1" />
         <div className="no-drag flex items-center gap-1.5">
           <AccountBadge onClick={() => navigate('/account')} />
+          <HelpMenu tour="home" />
+          <AccountOrb onClick={() => navigate('/account')} />
           <div className="mx-1 h-4 w-px bg-white/10" />
           <Tip content="Copy image to clipboard" side="bottom">
             <Button variant="secondary" size="sm" disabled={!img} onClick={copyImage}>
