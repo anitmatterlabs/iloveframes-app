@@ -4,9 +4,9 @@
  *
  *  - anonymous: a random install id made on first launch; no names, emails, file names,
  *    recordings, paths or license keys are ever sent
- *  - light: events are queued on disk and sent as one small batch ~90s after launch,
- *    every 6 hours and when the app quits (a handful of requests a day at most)
- *  - optional: Account -> "Share anonymous usage stats" turns it off; the queue is dropped
+ *  - light: events are queued on disk and sent as one small batch ~30s after launch, a tiny
+ *    "still here" ping every 15 minutes while the app is open, and a goodbye when it quits
+ *  - installs that turned it off in 1.0.5 / 1.0.6 (optOut) stay off
  */
 import { app, ipcMain, net } from 'electron'
 import { randomUUID } from 'crypto'
@@ -93,8 +93,9 @@ function markActiveDay() {
   track('app_active')
 }
 
-export async function flush(timeoutMs = 15000) {
-  if (!s || s.optOut || !ENABLED() || flushing || !s.queue.length) return
+export async function flush(o: { timeoutMs?: number; heartbeat?: boolean; bye?: boolean } = {}) {
+  const timeoutMs = o.timeoutMs ?? 15000
+  if (!s || s.optOut || !ENABLED() || flushing || (!s.queue.length && !o.heartbeat && !o.bye)) return
   flushing = true
   const batch = s.queue.slice(0, BATCH)
   try {
@@ -111,7 +112,8 @@ export async function flush(timeoutMs = 15000) {
         arch: process.arch,
         lic: licenseState(),
         loc: app.getLocale(),
-        ev: batch
+        ev: batch,
+        ...(o.bye ? { bye: 1 } : {})
       }),
       signal: ctrl.signal
     })
@@ -124,6 +126,14 @@ export async function flush(timeoutMs = 15000) {
     flushing = false
     saveNow()
   }
+}
+
+/** macOS keeps the app running with no windows: count that as closed until a window opens again. */
+let away = false
+export function setAway(v: boolean) {
+  if (away === v) return
+  away = v
+  flush(v ? { bye: true } : { heartbeat: true })
 }
 
 export function setOptOut(off: boolean) {
@@ -151,12 +161,15 @@ export function initTelemetry(o: { license: () => string }) {
   ipcMain.handle('telemetry:get', () => ({ optOut: s.optOut }))
   ipcMain.handle('telemetry:set', (_e, optOut: boolean) => setOptOut(!!optOut))
 
-  // send ~90s after launch, then every 6 hours (also counts the day as active)
-  setTimeout(() => flush(), process.env.ILF_TELEMETRY === '1' ? 4000 : 90_000)
+  // first report ~30s after launch; while the app stays open, a tiny "still here" ping every
+  // 15 minutes (it carries any queued events), so live counts know who's actually using it
+  setTimeout(() => flush(), process.env.ILF_TELEMETRY === '1' ? 4000 : 30_000)
   setInterval(() => {
+    if (away) return
     markActiveDay()
-    flush()
-  }, 6 * 3600_000)
+    flush({ heartbeat: true })
+  }, 15 * 60_000)
+  app.on('browser-window-created', () => setAway(false))
 
   process.on('uncaughtException', (err) => track('error', { msg: String(err?.message || err).slice(0, 120), where: 'main' }))
   app.on('render-process-gone', (_e, _wc, d) => track('crash', { msg: d.reason, code: d.exitCode }))
@@ -171,6 +184,6 @@ export function initTelemetry(o: { license: () => string }) {
     quitting = true
     track('app_session', { ms: Date.now() - startedAt })
     e.preventDefault()
-    flush(2500).finally(() => app.quit())
+    flush({ timeoutMs: 2500, bye: true }).finally(() => app.quit())
   })
 }

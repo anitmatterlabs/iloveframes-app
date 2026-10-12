@@ -117,8 +117,18 @@ export function FeedbackDialog() {
                 />
                 {phase === 'error' && (
                   <div className="rounded-xl border border-red-500/20 bg-red-500/[0.07] px-3.5 py-2.5 text-[12px] leading-snug text-red-300">
-                    {err}{' '}
-                    <a className="underline underline-offset-2" href={`mailto:hello@iloveframes.app?subject=${encodeURIComponent('iloveframes ' + kind)}&body=${encodeURIComponent(msg)}`}>Email it instead</a>
+                    {err}
+                    <div className="mt-2 flex gap-2">
+                      <button
+                        className="rounded-lg bg-white/[0.08] px-2.5 py-1 font-medium text-white hover:bg-white/[0.14]"
+                        onClick={() => window.ilf.mail(`mailto:support@iloveframes.app?subject=${encodeURIComponent('iloveframes ' + kind)}&body=${encodeURIComponent(msg)}`)}
+                      >
+                        Email it instead
+                      </button>
+                      <button className="rounded-lg px-2.5 py-1 text-red-200 hover:bg-white/[0.06]" onClick={() => navigator.clipboard.writeText(msg)}>
+                        Copy message
+                      </button>
+                    </div>
                   </div>
                 )}
                 <div className="flex items-center justify-between">

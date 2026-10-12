@@ -288,8 +288,6 @@ export function AccountPanel() {
         </div>
       </Card>
 
-      <UsageStatsCard />
-
       <AgentsCard />
 
       <UpdatesCard />
@@ -297,28 +295,6 @@ export function AccountPanel() {
       <div className="pt-2 text-center text-[11px] text-zinc-600">
         iloveframes {ver} · made with love ·{' '}
         <button className="underline-offset-2 hover:text-zinc-300 hover:underline" onClick={() => window.open(SITE)}>iloveframes.app</button>
-      </div>
-    </div>
-  )
-}
-
-/** Anonymous usage stats: on by default, one switch to turn off. */
-function UsageStatsCard() {
-  const [on, setOn] = useState<boolean | null>(null)
-  useEffect(() => {
-    window.ilf.telemetry.get().then((r) => setOn(!r.optOut))
-  }, [])
-  return (
-    <div className="rounded-[22px] border border-white/[0.07] bg-white/[0.02] p-5">
-      <div className="flex items-start justify-between gap-4">
-        <div className="flex gap-3">
-          <span className="grid h-9 w-9 shrink-0 place-items-center rounded-xl bg-white/[0.05] ring-1 ring-white/[0.06]"><ShieldCheck className="h-4 w-4 text-emerald-300" /></span>
-          <div>
-            <div className="text-[13px] font-semibold text-white">Share anonymous usage stats</div>
-            <div className="mt-0.5 text-[12px] leading-snug text-zinc-500">Helps us see which features people use and catch export problems. Anonymous: no name, email, files or recordings, ever. A few small updates a day.</div>
-          </div>
-        </div>
-        <Switch checked={!!on} disabled={on === null} onCheckedChange={async (v) => setOn(!(await window.ilf.telemetry.set(!v)).optOut)} aria-label="Share anonymous usage stats" />
       </div>
     </div>
   )

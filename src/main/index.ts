@@ -16,7 +16,7 @@ import { initLicense, status as licenseStatus, isUnlocked, activate as licenseAc
 import { importWallpapers, listWallpapers, removeWallpaper, importSounds, listSounds, removeSound, bundledWallpaperDir } from './library'
 import { appendRecData, readRecData, readSiblingProject, nextNumber, peekName, commitName, pad3 } from './ilfdata'
 import { initAgentBridge } from './agent'
-import { initTelemetry, track, trackOnce } from './telemetry'
+import { initTelemetry, setAway, track, trackOnce } from './telemetry'
 
 const isMac = process.platform === 'darwin'
 const devUrl = process.env['ELECTRON_RENDERER_URL']
@@ -861,13 +861,28 @@ ipcMain.handle('feedback:send', async (_e, f: { kind?: string; message?: string;
     os: `${process.platform} ${process.getSystemVersion?.() ?? ''} ${process.arch}`.trim(),
     plan: licenseStatus().state
   }
-  try {
-    const res = await net.fetch(CONFIG.feedbackUrl, { method: 'POST', headers: { 'content-type': 'application/json', 'x-ilf-app': app.getVersion() }, body: JSON.stringify(body) })
-    if (res.ok) return { ok: true }
-    return { ok: false, error: res.status === 429 ? 'That’s a lot of messages at once. Try again in a minute.' : 'Couldn’t send it right now.' }
-  } catch {
-    return { ok: false, error: 'You seem to be offline.' }
+  // two tries, a moment apart; failures are reported (status only) so we can see what goes wrong
+  let status = 0
+  let why = ''
+  for (let attempt = 0; attempt < 2; attempt++) {
+    try {
+      const res = await net.fetch(CONFIG.feedbackUrl, { method: 'POST', headers: { 'content-type': 'application/json', 'x-ilf-app': app.getVersion() }, body: JSON.stringify(body) })
+      if (res.ok) return { ok: true }
+      status = res.status
+      why = 'http'
+      if (status === 429) break
+    } catch (e: any) {
+      why = String(e?.message || e).slice(0, 80)
+    }
+    await new Promise((r) => setTimeout(r, 1200))
   }
+  track('feedback_failed', { status, why })
+  return { ok: false, error: status === 429 ? 'That’s a lot of messages at once. Try again in a minute, or email it instead.' : status ? `Couldn’t send it (error ${status}). You can email it instead.` : 'Couldn’t reach our server. You can email it instead.' }
+})
+
+// open the user's mail app (only mailto: links)
+ipcMain.handle('shell:mail', (_e, url: string) => {
+  if (typeof url === 'string' && url.startsWith('mailto:')) return shell.openExternal(url)
 })
 
 ipcMain.handle('update:state', () => updateState())
@@ -943,4 +958,5 @@ app.on('will-quit', () => globalShortcut.unregisterAll())
 app.on('window-all-closed', () => {
   if (rec) rec.capture?.kill()
   if (!isMac) app.quit()
+  else setAway(true)
 })

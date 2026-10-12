@@ -43,6 +43,7 @@ const api = {
   },
   reveal: (p: string) => ipcRenderer.invoke('shell:reveal', p),
   open: (p: string) => ipcRenderer.invoke('shell:open', p),
+  mail: (url: string) => ipcRenderer.invoke('shell:mail', url),
   pickImage: () => ipcRenderer.invoke('file:pick-image'),
   recordings: {
     list: (exceptId?: string) => ipcRenderer.invoke('recordings:list', exceptId)

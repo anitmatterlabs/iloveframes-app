@@ -955,3 +955,11 @@ module.exports.telemetry = async (app, win, out) => {
   await win.screenshot({ path: path.join(out, 'telemetry-account.png') })
   await win.waitForTimeout(3000) // first batch goes out ~4s after launch in this mode
 }
+
+// send feedback through the real app path and report what comes back
+module.exports.feedbackcheck = async (app, win, out) => {
+  const r = await win.evaluate(async () => {
+    try { return await window.ilf.feedback({ kind: 'bug', message: '[test] in-app feedback check from Claude, please ignore', email: '', name: 'test' }) } catch (e) { return { thrown: String(e) } }
+  })
+  console.log('FEEDBACK RESULT', JSON.stringify(r))
+}
