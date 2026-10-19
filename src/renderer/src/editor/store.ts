@@ -94,7 +94,7 @@ export function addSegmentAt(t: number, len = 3) {
     if (s.start > start && s.start < end) end = s.start - 0.05
   }
   if (end - start < 0.8) return
-  const seg: ZoomSegment = { id: uid(), start, end, scale: 2, follow: true, x: 0.5, y: 0.5 }
+  const seg: ZoomSegment = { id: uid(), start, end, scale: 1.5, follow: true, x: 0.5, y: 0.5 }
   track('zoom_added')
   updateEdit((e) => ({ ...e, zoom: { ...e.zoom, segments: [...e.zoom.segments, seg].sort((a, b) => a.start - b.start) } }))
   useEditor.getState().select(seg.id)
@@ -248,7 +248,7 @@ export function appendSources(sources: MediaSource[]) {
     const next: EditState = { ...e, clips }
     if (sources.some((s) => s.track)) {
       const kept = e.zoom.segments
-      const fresh = autoZoomSegments(project, clips, 2, e.crops).filter((z) => z.start >= from - 1e-3 && !kept.some((k) => z.start < k.end && z.end > k.start))
+      const fresh = autoZoomSegments(project, clips, 1.5, e.crops).filter((z) => z.start >= from - 1e-3 && !kept.some((k) => z.start < k.end && z.end > k.start))
       next.zoom = { ...e.zoom, segments: [...kept, ...fresh].sort((a, b) => a.start - b.start) }
     }
     if (sources.some((s) => s.track && !s.track.cursorBaked)) next.cursor = { ...e.cursor, enabled: true }

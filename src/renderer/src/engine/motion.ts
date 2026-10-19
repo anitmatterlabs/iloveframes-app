@@ -10,7 +10,7 @@ export const easeInOut = (t: number) => {
   t = clamp(t, 0, 1)
   return t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2
 }
-export const easeOutCubic = (t: number) => 1 - Math.pow(1 - clamp(t, 0, 1), 3)
+export const easeOutCubic =(t: number) => 1 - Math.pow(1 - clamp(t, 0, 1), 3)
 export const easeOutBack = (t: number) => {
   const c1 = 1.70158
   const c3 = c1 + 1
@@ -193,8 +193,6 @@ export class MotionTracks {
     const T = transitionFor(this.edit.zoom.speed)
     const wcam = lerp(7.5, 3.6, clamp(this.edit.zoom.followSmoothness, 0, 1))
     let active: ZoomSegment | null = null
-    this.clicks.sort((a, b) => a.t - b.t)
-    let ci = 0
     let gx = 0.5, gy = 0.5, pcx = 0.5, pcy = 0.5, pvx = 0, pvy = 0
     for (let i = 0; i < this.n; i++) {
       const t = i / HZ
@@ -223,23 +221,16 @@ export class MotionTracks {
       }
       if (seg.follow) {
         if (t >= seg.start + tr && t <= seg.end - tr) {
-          // keep the cursor in the middle of the view: a small dead zone so tiny
-          // jitters don't move the camera, aimed slightly ahead so it never trails
-          const m = hwF * 0.2
-          const sp = this.seqCursor(t + 0.25)
+          // the cursor roams freely inside the middle 50% of the view; the camera only
+          // moves when it leaves that box, and only by as much as it went out (never
+          // re-centres). Aimed a touch ahead so the frame doesn't trail the cursor.
+          const m = hwF * 0.5
+          const sp = this.seqCursor(t + 0.12)
           const cx = sp.x, cy = sp.y
           if (cx > gx + m) gx = cx - m
           if (cx < gx - m) gx = cx + m
           if (cy > gy + m) gy = cy - m
           if (cy < gy - m) gy = cy + m
-          // a click is a point of interest: centre it
-          while (ci < this.clicks.length && this.clicks[ci].t <= t) {
-            const c = this.clicks[ci++]
-            if (c.t >= seg.start) {
-              gx = c.x
-              gy = c.y
-            }
-          }
           gx = clamp(gx, hwF, 1 - hwF)
           gy = clamp(gy, hwF, 1 - hwF)
         }
@@ -329,7 +320,7 @@ export class MotionTracks {
 }
 
 /** Auto-zoom: cluster clicks + typing bursts into smooth zoom segments. */
-export function autoZoomSegments(project: Project, clips: SeqClip[], scale = 2, crops?: EditState['crops']): ZoomSegment[] {
+export function autoZoomSegments(project: Project, clips: SeqClip[], scale = 1.5, crops?: EditState['crops']): ZoomSegment[] {
   const dur = seqDuration(clips)
   const ev = seqEvents(project, clips, crops)
   const raw: { s: number; e: number; x: number; y: number }[] = []

@@ -491,11 +491,11 @@ function ZoomPanel({ edit }: { edit: EditState }) {
   const project = useEditor((s) => s.project)!
   const selected = useEditor((s) => s.selected)
   const seg = edit.zoom.segments.find((s) => s.id === selected)
-  const fresh = useMemo(() => autoZoomSegments(project, edit.clips, 2, edit.crops), [project, edit.clips, edit.crops])
+  const fresh = useMemo(() => autoZoomSegments(project, edit.clips, 1.5, edit.crops), [project, edit.clips, edit.crops])
   const sig = (l: { start: number; end: number; scale: number; follow: boolean }[]) => l.map((z) => [z.start.toFixed(2), z.end.toFixed(2), z.scale, z.follow].join(':')).join('|')
   const upToDate = fresh.length > 0 && sig(fresh) === sig(edit.zoom.segments)
   const regen = () => {
-    set((e) => ({ ...e, zoom: { ...e.zoom, segments: autoZoomSegments(project, e.clips, 2, e.crops) } }))
+    set((e) => ({ ...e, zoom: { ...e.zoom, segments: autoZoomSegments(project, e.clips, 1.5, e.crops) } }))
     useEditor.getState().select(null)
   }
   return (

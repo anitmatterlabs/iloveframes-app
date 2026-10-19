@@ -293,7 +293,7 @@ const tools: Record<string, (a: Args) => Promise<unknown> | unknown> = {
 
   auto_zoom: (a) => {
     const { project, edit } = editor()
-    const segs = autoZoomSegments(project, edit.clips, has(a, 'scale') ? clampN(a.scale, 1.1, 4) : 2, edit.crops)
+    const segs = autoZoomSegments(project, edit.clips, has(a, 'scale') ? clampN(a.scale, 1.1, 4) : 1.5, edit.crops)
     updateEdit((e) => ({ ...e, zoom: { ...e.zoom, segments: segs } }))
     notify('made automatic zooms')
     return `${segs.length} zooms from the recorded clicks.`
