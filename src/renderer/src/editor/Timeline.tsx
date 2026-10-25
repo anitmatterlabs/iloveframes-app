@@ -61,7 +61,7 @@ function ClipBlock({ clip, src, x, w, pps, selected, onDown, onEdge, label, show
   const step = src.duration / THUMBS_PER_SOURCE
   return (
     <div
-      className={cn('group absolute top-10 h-14 cursor-grab overflow-hidden rounded-xl bg-white/[0.03] ring-1 transition-shadow active:cursor-grabbing', selected ? 'z-10 ring-2 ring-brand-orchid shadow-[0_0_0_4px_rgba(192,132,252,.18)]' : 'ring-white/[0.08] hover:ring-white/25')}
+      className={cn('group absolute top-10 h-14 cursor-grab overflow-hidden rounded-xl bg-white/[0.03] ring-1 transition-shadow active:cursor-grabbing', selected ? 'z-10 ring-2 ring-brand-orchid shadow-[0_0_0_4px_rgba(255,143,107,.18)]' : 'ring-white/[0.08] hover:ring-white/25')}
       style={{ left: x, width: Math.max(6, w) }}
       onPointerDown={onDown}
     >
@@ -429,10 +429,10 @@ export function Timeline() {
           {insertAt === null &&
             edit.clips.map((c, i) => (i === 0 ? null : <TransitionHandle key={'th' + c.id} clipId={c.id} value={c.tIn} x={xOf(starts[i]) - 1} top={68} />))}
           {seqClicks.map((c, i) => (
-            <div key={i} className="pointer-events-none absolute top-[90px] z-10 h-1.5 w-1.5 -translate-x-1/2 rounded-full bg-brand-rose shadow-[0_0_6px_rgba(255,107,157,.8)]" style={{ left: xOf(c.t) }} />
+            <div key={i} className="pointer-events-none absolute top-[90px] z-10 h-1.5 w-1.5 -translate-x-1/2 rounded-full bg-brand-rose shadow-[0_0_6px_rgba(255,143,107,.8)]" style={{ left: xOf(c.t) }} />
           ))}
           {insertAt !== null && (
-            <div className="pointer-events-none absolute top-9 z-20 h-16 w-1 -translate-x-1/2 rounded-full bg-brand-orchid shadow-[0_0_10px_rgba(192,132,252,.9)]" style={{ left: xOf(insertAt >= edit.clips.length ? seqDur : starts[insertAt]) }} />
+            <div className="pointer-events-none absolute top-9 z-20 h-16 w-1 -translate-x-1/2 rounded-full bg-brand-orchid shadow-[0_0_10px_rgba(255,143,107,.9)]" style={{ left: xOf(insertAt >= edit.clips.length ? seqDur : starts[insertAt]) }} />
           )}
 
           {/* zoom lane */}
@@ -446,8 +446,8 @@ export function Timeline() {
             minW: 60,
             style: (sel) =>
               sel
-                ? 'border-white/70 bg-gradient-to-r from-brand-pink via-brand-orchid to-brand-violet text-white shadow-[0_0_0_3px_rgba(192,132,252,.25),0_8px_20px_-6px_rgba(214,77,170,.6)]'
-                : 'border-white/10 bg-gradient-to-r from-brand-pink/55 via-brand-orchid/50 to-brand-violet/55 text-white/90 hover:from-brand-pink/75 hover:via-brand-orchid/70 hover:to-brand-violet/75',
+                ? 'border-white/70 bg-gradient-to-b from-brand-rose to-brand-violet text-white shadow-[0_0_0_3px_rgba(255,143,107,.25),0_8px_20px_-6px_rgba(255,106,61,.45)]'
+                : 'border-white/10 bg-gradient-to-b from-brand-rose/50 to-brand-violet/50 text-white/90 hover:from-brand-rose/70 hover:to-brand-violet/70',
             keyframes: (sp) => {
               const T = transitionFor(edit.zoom.speed)
               const tr = Math.min(T, (sp.end - sp.start) / 2)
@@ -479,7 +479,7 @@ export function Timeline() {
             minW: 70,
             style: (sel) =>
               sel
-                ? 'border-white/70 bg-brand-deep/90 text-white shadow-[0_0_0_3px_rgba(124,58,237,.3)]'
+                ? 'border-white/70 bg-brand-deep/90 text-white shadow-[0_0_0_3px_rgba(94,101,115,.3)]'
                 : 'border-white/10 bg-brand-deep/40 text-white/90 hover:bg-brand-deep/60',
             label: () => (
               <>
@@ -491,7 +491,7 @@ export function Timeline() {
           {/* audio lane: drop sounds here */}
           <div
             data-tour="lane-audio"
-            className={cn('absolute rounded-xl ring-1 transition-colors', dropT !== null ? 'bg-brand-rose/[0.08] ring-brand-rose/50' : 'bg-white/[0.02] ring-white/[0.05]')}
+            className={cn('absolute rounded-xl ring-1 transition-colors', dropT !== null ? 'bg-brand-gold/[0.08] ring-brand-gold/50' : 'bg-white/[0.02] ring-white/[0.05]')}
             style={{ left: xOf(0), width: inner, top: 192, height: 34 }}
             onPointerDown={(e) => {
               if (e.target === e.currentTarget) useEditor.getState().select(null)
@@ -500,7 +500,7 @@ export function Timeline() {
             {edit.audio.clips.length === 0 && dropT === null && (
               <div className="pointer-events-none absolute inset-0 flex items-center px-3 text-[10.5px] text-zinc-600">Drag sounds here from the Audio tab, or drop audio files from your computer</div>
             )}
-            {dropT !== null && <div className="pointer-events-none absolute inset-y-1 w-0.5 rounded bg-brand-rose shadow-[0_0_8px_rgba(255,107,157,.8)]" style={{ left: dropT * pps }} />}
+            {dropT !== null && <div className="pointer-events-none absolute inset-y-1 w-0.5 rounded bg-brand-gold shadow-[0_0_8px_rgba(217,178,122,.8)]" style={{ left: dropT * pps }} />}
             {edit.audio.clips.map((c) => {
               const sel = c.id === selected
               const w = c.duration * pps
@@ -509,7 +509,7 @@ export function Timeline() {
                   key={c.id}
                   className={cn(
                     'absolute top-1 flex h-[26px] cursor-grab items-center overflow-hidden rounded-lg border text-[11px] font-medium active:cursor-grabbing',
-                    sel ? 'border-white/70 bg-brand-rose/85 text-white shadow-[0_0_0_3px_rgba(255,107,157,.25)]' : 'border-white/10 bg-brand-rose/35 text-white/90 hover:bg-brand-rose/50'
+                    sel ? 'border-white/70 bg-brand-gold/85 text-ink-950 shadow-[0_0_0_3px_rgba(217,178,122,.25)]' : 'border-white/10 bg-brand-gold/35 text-white/90 hover:bg-brand-gold/50'
                   )}
                   style={{ left: c.start * pps, width: Math.max(8, w) }}
                   onPointerDown={(e) => {

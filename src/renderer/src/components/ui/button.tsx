@@ -5,12 +5,12 @@ type Variant = 'primary' | 'secondary' | 'ghost' | 'outline' | 'danger' | 'recor
 type Size = 'sm' | 'md' | 'lg' | 'icon' | 'icon-sm'
 
 const variants: Record<Variant, string> = {
-  primary: 'bg-brand text-white shadow-glow hover:brightness-110 active:brightness-95',
+  primary: 'bg-primary font-semibold shadow-lift active:brightness-95',
   secondary: 'bg-white/[0.06] text-zinc-100 hover:bg-white/[0.1] border border-white/[0.06]',
   ghost: 'text-zinc-400 hover:text-zinc-100 hover:bg-white/[0.06]',
   outline: 'border border-white/10 text-zinc-200 hover:bg-white/[0.05] hover:border-white/20',
   danger: 'bg-red-500/10 text-red-400 hover:bg-red-500/20 border border-red-500/20',
-  record: 'bg-[#ff3b5c] text-white hover:bg-[#ff4d6b] shadow-[0_10px_40px_-8px_rgba(255,59,92,.7)]'
+  record: 'bg-[#f43f3a] bg-gradient-to-b from-[#ff5a4e] to-[#e8352f] text-white shadow-[inset_0_1px_0_rgba(255,255,255,.25),0_10px_40px_-8px_rgba(244,63,58,.6)] hover:brightness-110'
 }
 const sizes: Record<Size, string> = {
   sm: 'h-8 px-3 text-[12.5px] gap-1.5 rounded-lg',
@@ -29,7 +29,7 @@ export const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(({ classN
   <button
     ref={ref}
     className={cn(
-      'inline-flex select-none items-center justify-center whitespace-nowrap font-medium transition-all duration-150 disabled:pointer-events-none disabled:opacity-40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-violet-500/50 active:scale-[0.98]',
+      'inline-flex select-none items-center justify-center whitespace-nowrap font-medium transition-all duration-150 disabled:pointer-events-none disabled:opacity-40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-orchid/50 active:scale-[0.98]',
       variants[variant],
       sizes[size],
       className

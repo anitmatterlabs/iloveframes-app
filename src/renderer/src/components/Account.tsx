@@ -74,9 +74,9 @@ function TrialRing({ remaining, expired }: { remaining: number; expired: boolean
       <svg viewBox="0 0 100 100" className="h-full w-full -rotate-90">
         <defs>
           <linearGradient id="trg" x1="0" x2="1" y1="0" y2="1">
-            <stop stopColor="#ff4d8d" />
-            <stop offset=".55" stopColor="#c084fc" />
-            <stop offset="1" stopColor="#8b5cf6" />
+            <stop stopColor="#ffd2bf" />
+            <stop offset=".5" stopColor="#ff8f6b" />
+            <stop offset="1" stopColor="#ec5329" />
           </linearGradient>
         </defs>
         <circle cx="50" cy="50" r={R} stroke="rgba(255,255,255,.06)" strokeWidth="6" fill="none" />
@@ -415,7 +415,7 @@ export function LicenseGate() {
     <AnimatePresence>
       {st?.state === 'expired' && (
         <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="fixed inset-0 z-[100] grid place-items-center bg-ink-950/95 backdrop-blur-xl">
-          <div className="pointer-events-none absolute left-1/2 top-1/4 h-[420px] w-[620px] -translate-x-1/2 rounded-full bg-[radial-gradient(closest-side,rgba(139,92,246,.18),transparent)]" />
+          <div className="pointer-events-none absolute left-1/2 top-1/4 h-[420px] w-[620px] -translate-x-1/2 rounded-full bg-[radial-gradient(closest-side,rgba(255,236,224,.072),transparent)]" />
           <motion.div initial={{ y: 12, scale: 0.98 }} animate={{ y: 0, scale: 1 }} transition={{ type: 'spring', stiffness: 380, damping: 32 }} className="relative w-[440px] rounded-3xl border border-white/10 bg-[#101016] p-7 shadow-[0_40px_120px_-20px_rgba(0,0,0,.9)]">
             <LogoMark className="h-11 w-11" />
             <h2 className="mt-5 text-[20px] font-semibold tracking-[-0.02em] text-white">{st.tampered ? 'Activate iloveframes' : 'Your free trial has ended'}</h2>

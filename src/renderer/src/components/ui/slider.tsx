@@ -6,9 +6,9 @@ export const Slider = React.forwardRef<React.ElementRef<typeof SliderPrimitive.R
   ({ className, ...props }, ref) => (
     <SliderPrimitive.Root ref={ref} className={cn('relative flex h-5 w-full touch-none select-none items-center', className)} {...props}>
       <SliderPrimitive.Track className="relative h-[5px] w-full grow overflow-hidden rounded-full bg-white/[0.08]">
-        <SliderPrimitive.Range className="absolute h-full bg-gradient-to-r from-brand-pink via-brand-orchid to-brand-violet" />
+        <SliderPrimitive.Range className="absolute h-full bg-gradient-to-r from-brand-violet to-brand-rose" />
       </SliderPrimitive.Track>
-      <SliderPrimitive.Thumb className="block h-[15px] w-[15px] rounded-full bg-white shadow-[0_2px_8px_rgba(0,0,0,.5)] ring-0 transition-transform hover:scale-110 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-violet-500/30" />
+      <SliderPrimitive.Thumb className="block h-[15px] w-[15px] rounded-full bg-white shadow-[0_2px_8px_rgba(0,0,0,.5)] ring-0 transition-transform hover:scale-110 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-brand-orchid/30" />
     </SliderPrimitive.Root>
   )
 )

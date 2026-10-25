@@ -200,7 +200,7 @@ export function BackgroundPicker({ bg, onChange, onCommit }: { bg: EditState['ba
         </div>
         <label className="flex items-center gap-3 text-[12px] text-zinc-400">
           Custom color
-          <input type="color" value={bg.kind === 'solid' ? bg.value : '#ff4d8d'} onChange={(e) => onChange({ ...bg, kind: 'solid', value: e.target.value }, false)} onBlur={() => onCommit?.()} className="h-7 w-12 cursor-pointer rounded border-0 bg-transparent" />
+          <input type="color" value={bg.kind === 'solid' ? bg.value : '#ff6a3d'} onChange={(e) => onChange({ ...bg, kind: 'solid', value: e.target.value }, false)} onBlur={() => onCommit?.()} className="h-7 w-12 cursor-pointer rounded border-0 bg-transparent" />
         </label>
       </Section>
       <div data-tour="bg-library">
@@ -604,7 +604,7 @@ function FocusPicker({ x, y, onChange }: { x: number; y: number; onChange: (x: n
         onPointerUp={() => useEditor.getState().checkpoint()}
       >
         <img src={thumb} className="h-full w-full object-cover opacity-70" draggable={false} />
-        <div className="absolute h-6 w-6 -translate-x-1/2 -translate-y-1/2 rounded-full border-2 border-white shadow-[0_0_0_4px_rgba(139,92,246,.35)]" style={{ left: `${x * 100}%`, top: `${y * 100}%` }} />
+        <div className="absolute h-6 w-6 -translate-x-1/2 -translate-y-1/2 rounded-full border-2 border-white shadow-[0_0_0_4px_rgba(255,122,79,.35)]" style={{ left: `${x * 100}%`, top: `${y * 100}%` }} />
       </div>
     </div>
   )
@@ -635,7 +635,7 @@ function CameraPanel({ edit }: { edit: EditState }) {
             <div className="relative grid aspect-video grid-cols-2 grid-rows-2 gap-2 rounded-xl border border-white/[0.06] bg-white/[0.02] p-2">
               {(['tl', 'tr', 'bl', 'br'] as CamPos[]).map((p) => (
                 <button key={p} onClick={() => setC({ position: p })} className={cn('flex p-2 transition-all', p[0] === 't' ? 'items-start' : 'items-end', p[1] === 'l' ? 'justify-start' : 'justify-end', 'rounded-lg hover:bg-white/[0.04]')}>
-                  <div className={cn('h-6 w-6 rounded-full border-2 transition-all', c.position === p ? 'border-brand-lilac bg-brand-orchid/40 shadow-[0_0_12px_rgba(139,92,246,.5)]' : 'border-zinc-600 bg-white/5')} />
+                  <div className={cn('h-6 w-6 rounded-full border-2 transition-all', c.position === p ? 'border-brand-lilac bg-brand-orchid/40 shadow-[0_0_12px_rgba(255,122,79,.5)]' : 'border-zinc-600 bg-white/5')} />
                 </button>
               ))}
             </div>

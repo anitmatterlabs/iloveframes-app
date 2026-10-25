@@ -33,7 +33,7 @@ function Tile({ kind, label, active, onClick, title }: { kind: TransitionKind | 
         className={cn(
           'trp-tile relative aspect-[16/10] w-full overflow-hidden rounded-lg ring-1 transition-all duration-150',
           `trp-${kind}`,
-          active ? 'ring-2 ring-brand-orchid shadow-[0_0_0_3px_rgba(192,132,252,.18)]' : 'ring-white/10 group-hover/tile:ring-white/30'
+          active ? 'ring-2 ring-brand-orchid shadow-[0_0_0_3px_rgba(255,143,107,.18)]' : 'ring-white/10 group-hover/tile:ring-white/30'
         )}
       >
         <div className="trp trp-a" />

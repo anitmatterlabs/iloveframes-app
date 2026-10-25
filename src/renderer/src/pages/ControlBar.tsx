@@ -42,7 +42,7 @@ export default function ControlBar({ start }: { start: number }) {
         <button
           title={`Stop recording (${modKey}+Shift+2)`}
           onClick={() => window.ilf.rec.requestStop()}
-          className="no-drag grid h-12 w-12 place-items-center rounded-full bg-[#ff3b5c] text-white shadow-[0_8px_22px_-4px_rgba(255,59,92,.75)] transition-all hover:scale-105 hover:bg-[#ff4d6b] active:scale-95"
+          className="no-drag grid h-12 w-12 place-items-center rounded-full bg-gradient-to-b from-[#ff5a4e] to-[#e8352f] text-white shadow-[inset_0_1px_0_rgba(255,255,255,.25),0_8px_22px_-4px_rgba(244,63,58,.65)] transition-all hover:scale-105 hover:bg-[#ff4d6b] active:scale-95"
         >
           <Square className="h-4 w-4" fill="currentColor" />
         </button>

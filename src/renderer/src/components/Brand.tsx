@@ -4,22 +4,24 @@ export function LogoMark({ className }: { className?: string }) {
   return (
     <svg viewBox="0 0 64 64" className={cn('h-7 w-7', className)} fill="none">
       <defs>
-        <linearGradient id="lg-a" x1="4" y1="4" x2="60" y2="60" gradientUnits="userSpaceOnUse">
-          <stop stopColor="#ff4d8d" />
-          <stop offset=".35" stopColor="#c026d3" />
-          <stop offset=".7" stopColor="#7c3aed" />
-          <stop offset="1" stopColor="#2563eb" />
+        <linearGradient id="lg-a" x1="32" y1="4" x2="32" y2="60" gradientUnits="userSpaceOnUse">
+          <stop stopColor="#2e2e34" />
+          <stop offset="1" stopColor="#0d0d10" />
         </linearGradient>
-        <radialGradient id="lg-b" cx="50" cy="12" r="22" gradientUnits="userSpaceOnUse">
-          <stop stopColor="#ffb347" stopOpacity=".85" />
-          <stop offset="1" stopColor="#ffb347" stopOpacity="0" />
+        <linearGradient id="lg-h" x1="32" y1="24" x2="32" y2="44" gradientUnits="userSpaceOnUse">
+          <stop stopColor="#ff9a74" />
+          <stop offset="1" stopColor="#ec5329" />
+        </linearGradient>
+        <radialGradient id="lg-b" cx="32" cy="2" r="34" gradientUnits="userSpaceOnUse">
+          <stop stopColor="#fff" stopOpacity=".14" />
+          <stop offset="1" stopColor="#fff" stopOpacity="0" />
         </radialGradient>
       </defs>
       <rect x="4" y="4" width="56" height="56" rx="15" fill="url(#lg-a)" />
       <rect x="4" y="4" width="56" height="56" rx="15" fill="url(#lg-b)" />
-      <rect x="4.5" y="4.5" width="55" height="55" rx="14.5" stroke="white" strokeOpacity=".18" />
-      <path d="M15 23v-4.5a3.5 3.5 0 0 1 3.5-3.5H23M41 15h4.5a3.5 3.5 0 0 1 3.5 3.5V23M49 41v4.5a3.5 3.5 0 0 1-3.5 3.5H41M23 49h-4.5a3.5 3.5 0 0 1-3.5-3.5V41" stroke="white" strokeWidth="3.4" strokeLinecap="round" />
-      <path d="M32 43.5s-10.5-6.2-10.5-13.2c0-3.4 2.6-5.8 5.6-5.8 2.1 0 3.9 1.1 4.9 2.8 1-1.7 2.8-2.8 4.9-2.8 3 0 5.6 2.4 5.6 5.8 0 7-10.5 13.2-10.5 13.2Z" fill="white" />
+      <rect x="4.5" y="4.5" width="55" height="55" rx="14.5" stroke="white" strokeOpacity=".14" />
+      <path d="M15 23v-4.5a3.5 3.5 0 0 1 3.5-3.5H23M41 15h4.5a3.5 3.5 0 0 1 3.5 3.5V23M49 41v4.5a3.5 3.5 0 0 1-3.5 3.5H41M23 49h-4.5a3.5 3.5 0 0 1-3.5-3.5V41" stroke="white" strokeOpacity=".92" strokeWidth="3.4" strokeLinecap="round" />
+      <path d="M32 43.5s-10.5-6.2-10.5-13.2c0-3.4 2.6-5.8 5.6-5.8 2.1 0 3.9 1.1 4.9 2.8 1-1.7 2.8-2.8 4.9-2.8 3 0 5.6 2.4 5.6 5.8 0 7-10.5 13.2-10.5 13.2Z" fill="url(#lg-h)" />
     </svg>
   )
 }

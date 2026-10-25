@@ -5,14 +5,15 @@ module.exports = {
     extend: {
       fontFamily: { sans: ['"Inter Variable"', 'system-ui', 'sans-serif'] },
       colors: {
-        ink: { 950: '#07070a', 900: '#0c0c11', 850: '#111117', 800: '#16161d', 700: '#1d1d26', 600: '#272732', 500: '#3a3a48' },
-        rose: { 400: '#ff6b9d', 500: '#ff4d8d', 600: '#f02d76' },
-        violet: { 400: '#a78bfa', 500: '#8b5cf6' },
-        // iloveframes brand: the pink to violet of the logo and the home headline
-        brand: { pink: '#ff4d8d', rose: '#ff6b9d', orchid: '#c084fc', lilac: '#d8b4fe', violet: '#8b5cf6', deep: '#7c3aed' }
+        // neutral graphite: no blue or purple cast in the chrome
+        ink: { 950: '#09090b', 900: '#0e0e10', 850: '#121214', 800: '#17171a', 700: '#1e1e22', 600: '#28282d', 500: '#3a3a41' },
+        // iloveframes brand: one warm ember accent, used sparingly, plus champagne for Pro.
+        // Key names are kept from the old palette so every brand-* class follows the new tokens.
+        brand: { pink: '#ff6a3d', rose: '#ff8f6b', orchid: '#ff8f6b', lilac: '#ffc2a8', violet: '#e8542c', deep: '#5e6573', gold: '#d9b27a' }
       },
       boxShadow: {
-        glow: '0 0 0 1px rgba(192,132,252,.35), 0 10px 30px -8px rgba(214,77,170,.55)',
+        glow: '0 0 0 1px rgba(255,143,107,.30), 0 10px 30px -10px rgba(255,106,61,.45)',
+        lift: '0 1px 0 0 rgba(255,255,255,.7) inset, 0 1px 2px rgba(0,0,0,.4), 0 8px 24px -10px rgba(255,255,255,.28)',
         panel: '0 1px 0 0 rgba(255,255,255,.04) inset, 0 20px 50px -20px rgba(0,0,0,.6)'
       },
       keyframes: {

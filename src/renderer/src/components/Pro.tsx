@@ -115,7 +115,7 @@ export function HelpMenu({ tour }: { tour: 'home' | 'editor' }) {
 export const useCelebrate = create<{ open: boolean }>(() => ({ open: false }))
 export const celebrate = () => useCelebrate.setState({ open: true })
 
-const COLORS = ['#ff4d8d', '#ff6b9d', '#c084fc', '#8b5cf6', '#ffd479', '#ffffff']
+const COLORS = ['#ff6a3d', '#ff8f6b', '#ffc2a8', '#f3dfbd', '#d9b27a', '#ffffff']
 
 /** Lightweight canvas confetti in the brand colours: two side cannons and a top shower. */
 function Confetti() {
@@ -215,7 +215,7 @@ export function ProCelebration() {
       {open && (
         <>
           <motion.div key="bg" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} transition={{ duration: 0.3 }} className="fixed inset-0 z-[120] grid place-items-center bg-ink-950/80 backdrop-blur-xl" onClick={close}>
-            <div className="pointer-events-none absolute left-1/2 top-1/2 h-[520px] w-[520px] -translate-x-1/2 -translate-y-1/2 rounded-full bg-[radial-gradient(closest-side,rgba(214,77,170,.28),transparent)]" />
+            <div className="pointer-events-none absolute left-1/2 top-1/2 h-[520px] w-[520px] -translate-x-1/2 -translate-y-1/2 rounded-full bg-[radial-gradient(closest-side,rgba(255,106,61,.21),transparent)]" />
             <motion.div
               initial={{ opacity: 0, y: 24, scale: 0.94 }}
               animate={{ opacity: 1, y: 0, scale: 1 }}
@@ -224,10 +224,10 @@ export function ProCelebration() {
               onClick={(e) => e.stopPropagation()}
               className="relative w-[420px] overflow-hidden rounded-[28px] border border-white/10 bg-[#101016] px-8 pb-7 pt-9 text-center shadow-[0_40px_120px_-20px_rgba(0,0,0,.9)]"
             >
-              <div className="pointer-events-none absolute inset-x-0 top-0 h-40 bg-[radial-gradient(80%_100%_at_50%_0%,rgba(192,132,252,.22),transparent)]" />
+              <div className="pointer-events-none absolute inset-x-0 top-0 h-40 bg-[radial-gradient(80%_100%_at_50%_0%,rgba(255,143,107,.22),transparent)]" />
               <motion.div initial={{ scale: 0.4, rotate: -12 }} animate={{ scale: 1, rotate: 0 }} transition={{ type: 'spring', stiffness: 300, damping: 14, delay: 0.15 }} className="relative mx-auto h-20 w-20">
-                <div className="absolute -inset-3 animate-[spin_6s_linear_infinite] rounded-[30px] bg-[conic-gradient(from_0deg,transparent,#ff4d8d,#c084fc,#8b5cf6,transparent)] opacity-60 blur-md" />
-                <LogoMark className="relative h-20 w-20 drop-shadow-[0_12px_30px_rgba(214,77,170,.5)]" />
+                <div className="absolute -inset-3 animate-[spin_6s_linear_infinite] rounded-[30px] bg-[conic-gradient(from_0deg,transparent,#f3dfbd,#d9b27a,#8a6630,transparent)] opacity-60 blur-md" />
+                <LogoMark className="relative h-20 w-20 drop-shadow-[0_12px_30px_rgba(255,106,61,.375)]" />
                 <ProBadge className="absolute -bottom-2 left-1/2 -translate-x-1/2 shadow-lg" />
               </motion.div>
               <motion.h2 initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.3 }} className="relative mt-7 text-[26px] font-semibold leading-tight tracking-[-0.03em] text-white">

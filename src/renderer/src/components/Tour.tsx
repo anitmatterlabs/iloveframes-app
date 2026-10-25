@@ -342,7 +342,7 @@ function TourRun() {
                   <ArrowLeft className="h-3.5 w-3.5" />
                 </button>
               )}
-              <button onClick={() => go(1)} className="bg-brand flex h-8 shrink-0 items-center gap-1.5 rounded-lg px-3.5 text-[12px] font-semibold text-white shadow-glow transition-[filter] hover:brightness-110">
+              <button onClick={() => go(1)} className="bg-primary flex h-8 shrink-0 items-center gap-1.5 rounded-lg px-3.5 text-[12px] font-semibold shadow-lift transition-[filter] active:brightness-95">
                 {last ? 'Done' : pos === 0 && !step.target ? 'Show me' : 'Next'}
                 {!last && <ArrowRight className="h-3.5 w-3.5" />}
               </button>
