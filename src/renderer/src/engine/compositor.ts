@@ -41,7 +41,7 @@ function drawCursor(ctx: Ctx, x: number, y: number, size: number, style: EditSta
       ctx.stroke()
     } else {
       ctx.lineWidth = size * 0.11
-      ctx.strokeStyle = 'rgba(255,106,61,0.95)'
+      ctx.strokeStyle = 'rgba(255,79,123,0.95)'
       ctx.stroke()
     }
     ctx.restore()
@@ -224,7 +224,7 @@ function paintWindow(ctx: Ctx, t: number, edit: EditState, tracks: MotionTracks,
         if (edit.cursor.clickEffect === 'ripple') {
           ctx.beginPath()
           ctx.arc(p.x, p.y, lerp(baseSize * 0.2, baseSize * 1.5, e), 0, Math.PI * 2)
-          ctx.fillStyle = `rgba(255,106,61,${0.22 * (1 - e)})`
+          ctx.fillStyle = `rgba(255,79,123,${0.22 * (1 - e)})`
           ctx.fill()
           ctx.lineWidth = Math.max(1.5, baseSize * 0.08) * (1 - e * 0.5)
           ctx.strokeStyle = `rgba(255,255,255,${0.9 * (1 - e)})`
@@ -232,7 +232,7 @@ function paintWindow(ctx: Ctx, t: number, edit: EditState, tracks: MotionTracks,
         } else {
           ctx.beginPath()
           ctx.arc(p.x, p.y, baseSize * (0.6 + 0.5 * e), 0, Math.PI * 2)
-          ctx.fillStyle = `rgba(255,143,107,${0.35 * (1 - e)})`
+          ctx.fillStyle = `rgba(255,125,156,${0.35 * (1 - e)})`
           ctx.fill()
         }
         ctx.restore()
@@ -477,9 +477,9 @@ export function drawTransition(
       const q1 = P(s + soft * 0.6)
       const glow = ctx.createLinearGradient(q0.x, q0.y, q1.x, q1.y)
       const ga = 0.22 * Math.sin(Math.PI * p)
-      glow.addColorStop(0, 'rgba(255,143,107,0)')
-      glow.addColorStop(0.5, `rgba(255,240,230,${ga})`)
-      glow.addColorStop(1, 'rgba(255,122,79,0)')
+      glow.addColorStop(0, 'rgba(255,125,156,0)')
+      glow.addColorStop(0.5, `rgba(255,236,241,${ga})`)
+      glow.addColorStop(1, 'rgba(255,95,135,0)')
       ctx.fillStyle = glow
       ctx.fillRect(fr.x, fr.y, fr.w, fr.h)
       ctx.restore()

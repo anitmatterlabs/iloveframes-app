@@ -9,8 +9,8 @@ export function LogoMark({ className }: { className?: string }) {
           <stop offset="1" stopColor="#0d0d10" />
         </linearGradient>
         <linearGradient id="lg-h" x1="32" y1="24" x2="32" y2="44" gradientUnits="userSpaceOnUse">
-          <stop stopColor="#ff9a74" />
-          <stop offset="1" stopColor="#ec5329" />
+          <stop stopColor="#ff8fab" />
+          <stop offset="1" stopColor="#e0375f" />
         </linearGradient>
         <radialGradient id="lg-b" cx="32" cy="2" r="34" gradientUnits="userSpaceOnUse">
           <stop stopColor="#fff" stopOpacity=".14" />

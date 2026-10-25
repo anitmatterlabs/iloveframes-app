@@ -168,7 +168,7 @@ export default function AreaPicker({ W, H, sf, initial }: { W: number; H: number
           className="absolute"
           style={{ left: rect.x, top: rect.y, width: rect.w, height: rect.h, boxShadow: '0 0 0 9999px rgba(8,6,14,.55)' }}
         >
-          <div className="absolute inset-0 cursor-move rounded-[3px] ring-2 ring-brand-orchid shadow-[0_0_0_1px_rgba(0,0,0,.4),0_0_40px_rgba(255,106,61,.262)]" onPointerDown={start('move')} />
+          <div className="absolute inset-0 cursor-move rounded-[3px] ring-2 ring-brand-orchid shadow-[0_0_0_1px_rgba(0,0,0,.4),0_0_40px_rgba(255,79,123,.262)]" onPointerDown={start('move')} />
           {busy && (
             <div className="pointer-events-none absolute inset-0 [background:linear-gradient(to_right,transparent_33.2%,rgba(255,255,255,.28)_33.3%,transparent_33.5%,transparent_66.5%,rgba(255,255,255,.28)_66.6%,transparent_66.8%),linear-gradient(to_bottom,transparent_33.2%,rgba(255,255,255,.28)_33.3%,transparent_33.5%,transparent_66.5%,rgba(255,255,255,.28)_66.6%,transparent_66.8%)]" />
           )}

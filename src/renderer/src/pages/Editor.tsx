@@ -284,7 +284,7 @@ export default function Editor({ id }: { id: string }) {
       <div className="flex min-h-0 flex-1">
         <div className="flex min-w-0 flex-1 flex-col">
           <motion.div initial={{ opacity: 0, scale: 0.985 }} animate={{ opacity: 1, scale: 1 }} transition={{ duration: 0.4, ease: [0.2, 0.8, 0.2, 1] }} data-tour="preview" className="relative min-h-0 flex-1 px-8 pt-6">
-            <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(ellipse_at_center,rgba(255,236,224,.024),transparent_60%)]" />
+            <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(ellipse_at_center,rgba(255,232,238,.024),transparent_60%)]" />
             <Preview />
           </motion.div>
           <Transport onToast={flash} />

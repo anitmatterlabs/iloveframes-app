@@ -61,7 +61,7 @@ function ClipBlock({ clip, src, x, w, pps, selected, onDown, onEdge, label, show
   const step = src.duration / THUMBS_PER_SOURCE
   return (
     <div
-      className={cn('group absolute top-10 h-14 cursor-grab overflow-hidden rounded-xl bg-white/[0.03] ring-1 transition-shadow active:cursor-grabbing', selected ? 'z-10 ring-2 ring-brand-orchid shadow-[0_0_0_4px_rgba(255,143,107,.18)]' : 'ring-white/[0.08] hover:ring-white/25')}
+      className={cn('group absolute top-10 h-14 cursor-grab overflow-hidden rounded-xl bg-white/[0.03] ring-1 transition-shadow active:cursor-grabbing', selected ? 'z-10 ring-2 ring-brand-orchid shadow-[0_0_0_4px_rgba(255,125,156,.18)]' : 'ring-white/[0.08] hover:ring-white/25')}
       style={{ left: x, width: Math.max(6, w) }}
       onPointerDown={onDown}
     >
@@ -429,10 +429,10 @@ export function Timeline() {
           {insertAt === null &&
             edit.clips.map((c, i) => (i === 0 ? null : <TransitionHandle key={'th' + c.id} clipId={c.id} value={c.tIn} x={xOf(starts[i]) - 1} top={68} />))}
           {seqClicks.map((c, i) => (
-            <div key={i} className="pointer-events-none absolute top-[90px] z-10 h-1.5 w-1.5 -translate-x-1/2 rounded-full bg-brand-rose shadow-[0_0_6px_rgba(255,143,107,.8)]" style={{ left: xOf(c.t) }} />
+            <div key={i} className="pointer-events-none absolute top-[90px] z-10 h-1.5 w-1.5 -translate-x-1/2 rounded-full bg-brand-rose shadow-[0_0_6px_rgba(255,125,156,.8)]" style={{ left: xOf(c.t) }} />
           ))}
           {insertAt !== null && (
-            <div className="pointer-events-none absolute top-9 z-20 h-16 w-1 -translate-x-1/2 rounded-full bg-brand-orchid shadow-[0_0_10px_rgba(255,143,107,.9)]" style={{ left: xOf(insertAt >= edit.clips.length ? seqDur : starts[insertAt]) }} />
+            <div className="pointer-events-none absolute top-9 z-20 h-16 w-1 -translate-x-1/2 rounded-full bg-brand-orchid shadow-[0_0_10px_rgba(255,125,156,.9)]" style={{ left: xOf(insertAt >= edit.clips.length ? seqDur : starts[insertAt]) }} />
           )}
 
           {/* zoom lane */}
@@ -446,7 +446,7 @@ export function Timeline() {
             minW: 60,
             style: (sel) =>
               sel
-                ? 'border-white/70 bg-gradient-to-b from-brand-rose to-brand-violet text-white shadow-[0_0_0_3px_rgba(255,143,107,.25),0_8px_20px_-6px_rgba(255,106,61,.45)]'
+                ? 'border-white/70 bg-gradient-to-b from-brand-rose to-brand-violet text-white shadow-[0_0_0_3px_rgba(255,125,156,.25),0_8px_20px_-6px_rgba(255,79,123,.45)]'
                 : 'border-white/10 bg-gradient-to-b from-brand-rose/50 to-brand-violet/50 text-white/90 hover:from-brand-rose/70 hover:to-brand-violet/70',
             keyframes: (sp) => {
               const T = transitionFor(edit.zoom.speed)

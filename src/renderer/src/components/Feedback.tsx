@@ -71,7 +71,7 @@ export function FeedbackDialog() {
             transition={{ type: 'spring', stiffness: 400, damping: 32 }}
             className="relative w-[460px] overflow-hidden rounded-3xl border border-white/10 bg-[#101016] p-6 shadow-[0_40px_120px_-20px_rgba(0,0,0,.9)]"
           >
-            <div className="pointer-events-none absolute inset-x-0 top-0 h-28 bg-[radial-gradient(70%_100%_at_30%_0%,rgba(255,106,61,.12),transparent)]" />
+            <div className="pointer-events-none absolute inset-x-0 top-0 h-28 bg-[radial-gradient(70%_100%_at_30%_0%,rgba(255,79,123,.12),transparent)]" />
             <div className="relative flex items-start justify-between">
               <div>
                 <div className="text-[17px] font-semibold tracking-[-0.02em] text-white">Send feedback</div>

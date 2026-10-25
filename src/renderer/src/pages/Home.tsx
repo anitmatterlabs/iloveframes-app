@@ -345,10 +345,10 @@ export default function Home() {
   return (
     <div className="relative flex h-full flex-col overflow-hidden bg-ink-950">
       <div className="pointer-events-none absolute -top-48 left-1/2 h-[520px] w-[980px] -translate-x-1/2">
-        <div className="aurora-a h-full w-full rounded-full bg-[radial-gradient(closest-side,rgba(255,106,61,.08),transparent)]" />
+        <div className="aurora-a h-full w-full rounded-full bg-[radial-gradient(closest-side,rgba(255,79,123,.08),transparent)]" />
       </div>
-      <div className="aurora-b pointer-events-none absolute -top-24 right-0 h-[420px] w-[620px] rounded-full bg-[radial-gradient(closest-side,rgba(255,236,224,.048),transparent)]" />
-      <div className="aurora-a pointer-events-none absolute -bottom-40 -left-24 h-[380px] w-[560px] rounded-full bg-[radial-gradient(closest-side,rgba(255,143,107,.06),transparent)]" />
+      <div className="aurora-b pointer-events-none absolute -top-24 right-0 h-[420px] w-[620px] rounded-full bg-[radial-gradient(closest-side,rgba(255,232,238,.048),transparent)]" />
+      <div className="aurora-a pointer-events-none absolute -bottom-40 -left-24 h-[380px] w-[560px] rounded-full bg-[radial-gradient(closest-side,rgba(255,125,156,.06),transparent)]" />
       <Titlebar>
         <span className="logo-beat inline-flex"><LogoMark className="h-[22px] w-[22px]" /></span>
         <Wordmark className="text-[14px]" />
@@ -397,7 +397,7 @@ export default function Home() {
           </motion.div>
 
           {needsPerms && (
-            <div className="flex items-center gap-3 rounded-xl border border-brand-rose/25 bg-brand-rose/[0.06] px-4 py-2.5 text-[12.5px] text-orange-50">
+            <div className="flex items-center gap-3 rounded-xl border border-brand-rose/25 bg-brand-rose/[0.06] px-4 py-2.5 text-[12.5px] text-rose-50">
               <ShieldAlert className="h-4 w-4 shrink-0" />
               <div className="flex-1">
                 {perms.screen !== 'granted' ? 'Screen Recording permission is needed. ' : ''}
@@ -440,14 +440,14 @@ export default function Home() {
                       <button
                         key={d.id}
                         onClick={() => setDisplayId(d.id)}
-                        className={cn('group relative overflow-hidden rounded-xl border p-1.5 text-left transition-all duration-200', sel ? 'border-brand-orchid/60 bg-brand-soft shadow-[0_0_0_3px_rgba(255,122,79,.14)]' : 'border-white/[0.07] bg-white/[0.02] hover:border-white/15')}
+                        className={cn('group relative overflow-hidden rounded-xl border p-1.5 text-left transition-all duration-200', sel ? 'border-brand-orchid/60 bg-brand-soft shadow-[0_0_0_3px_rgba(255,95,135,.14)]' : 'border-white/[0.07] bg-white/[0.02] hover:border-white/15')}
                       >
                         <div className="checker relative aspect-video overflow-hidden rounded-lg">
                           {d.thumbnail ? <img src={d.thumbnail} className="h-full w-full object-cover" /> : <div className="grid h-full place-items-center text-zinc-600"><Monitor className="h-5 w-5" /></div>}
                           {sel && area && (
                             <div
                               className="pointer-events-none absolute rounded-[3px] border-2 border-white/90 transition-all duration-300"
-                              style={{ left: `${(area.x / area.W) * 100}%`, top: `${(area.y / area.H) * 100}%`, width: `${(area.w / area.W) * 100}%`, height: `${(area.h / area.H) * 100}%`, boxShadow: '0 0 0 999px rgba(4,3,8,.72), 0 0 0 1px rgba(255,143,107,.9), 0 0 22px 2px rgba(255,106,61,.45)' }}
+                              style={{ left: `${(area.x / area.W) * 100}%`, top: `${(area.y / area.H) * 100}%`, width: `${(area.w / area.W) * 100}%`, height: `${(area.h / area.H) * 100}%`, boxShadow: '0 0 0 999px rgba(4,3,8,.72), 0 0 0 1px rgba(255,125,156,.9), 0 0 22px 2px rgba(255,79,123,.45)' }}
                             >
                               <span className="bg-brand absolute -top-px left-1/2 -translate-x-1/2 -translate-y-1/2 rounded-full px-1.5 py-px text-[8.5px] font-bold uppercase tracking-[.1em] text-white shadow">Area</span>
                             </div>
@@ -649,7 +649,7 @@ export default function Home() {
           <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="absolute inset-0 z-50 grid place-items-center bg-ink-950/85 backdrop-blur-xl">
             <div className="flex flex-col items-center">
               <div className="relative h-20 w-20">
-                <div className="absolute inset-0 animate-spin rounded-[26px] bg-[conic-gradient(from_0deg,transparent,#ffc2a8,#ff6a3d,transparent)] [animation-duration:1.6s]" />
+                <div className="absolute inset-0 animate-spin rounded-[26px] bg-[conic-gradient(from_0deg,transparent,#ffc4d2,#ff4f7b,transparent)] [animation-duration:1.6s]" />
                 <div className="absolute inset-[3px] grid place-items-center rounded-[23px] bg-ink-950">
                   <LogoMark className="h-10 w-10" />
                 </div>

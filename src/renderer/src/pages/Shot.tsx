@@ -292,7 +292,7 @@ export default function Shot() {
 
       <div className="flex min-h-0 flex-1">
         <div className="relative min-w-0 flex-1 p-8">
-          <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(ellipse_at_center,rgba(255,236,224,.024),transparent_60%)]" />
+          <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(ellipse_at_center,rgba(255,232,238,.024),transparent_60%)]" />
           {!img ? (
             <div className="grid h-full place-items-center">
               <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} className={cn('flex w-[460px] flex-col items-center rounded-3xl border border-dashed px-8 py-12 text-center transition-colors', over ? 'border-brand-orchid/70 bg-brand-soft' : 'border-white/12 bg-white/[0.02]')}>

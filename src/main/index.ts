@@ -148,7 +148,7 @@ function showAreaOutline(display: Display, f: CropFrac) {
   areaWin.setAlwaysOnTop(true, 'screen-saver')
   areaWin.setContentProtection(true)
   areaWin.loadURL('data:text/html,' + encodeURIComponent(
-    '<html><body style="margin:0;background:transparent;overflow:hidden"><div style="position:fixed;inset:0;border:2px dashed rgba(255,106,61,.9);border-radius:6px;box-shadow:0 0 0 1px rgba(0,0,0,.35)"></div></body></html>'
+    '<html><body style="margin:0;background:transparent;overflow:hidden"><div style="position:fixed;inset:0;border:2px dashed rgba(255,79,123,.9);border-radius:6px;box-shadow:0 0 0 1px rgba(0,0,0,.35)"></div></body></html>'
   ))
   areaWin.once('ready-to-show', () => {
     areaWin?.showInactive()

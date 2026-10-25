@@ -21,13 +21,13 @@ body.transparent { background: transparent; }
 ::-webkit-scrollbar-thumb { background: rgba(255,255,255,.08); border-radius: 10px; border: 3px solid transparent; background-clip: content-box; }
 ::-webkit-scrollbar-thumb:hover { background: rgba(255,255,255,.16); background-clip: content-box; border: 3px solid transparent; }
 ::-webkit-scrollbar-track { background: transparent; }
-.text-gradient { background: linear-gradient(100deg, #fff3ec 0%, #ffb59a 48%, #ff6a3d 100%); -webkit-background-clip: text; background-clip: text; color: transparent; }
-.bg-brand { background-color: #f25c32; background-image: linear-gradient(180deg, #ff7a4f 0%, #ec5329 100%); box-shadow: inset 0 1px 0 rgba(255,255,255,.25), inset 0 -1px 0 rgba(0,0,0,.12); }
-.bg-brand-soft { background-image: linear-gradient(180deg, rgba(255,122,79,.11), rgba(255,122,79,.05)); }
+.text-gradient { background: linear-gradient(100deg, #fff0f4 0%, #ffa3b9 48%, #ff4f7b 100%); -webkit-background-clip: text; background-clip: text; color: transparent; }
+.bg-brand { background-color: #f04470; background-image: linear-gradient(180deg, #ff6a8e 0%, #e0375f 100%); box-shadow: inset 0 1px 0 rgba(255,255,255,.25), inset 0 -1px 0 rgba(0,0,0,.12); }
+.bg-brand-soft { background-image: linear-gradient(180deg, rgba(255,95,135,.11), rgba(255,95,135,.05)); }
 /* primary actions: a quiet off-white key, like a well-made physical button */
 .bg-primary { background-image: linear-gradient(180deg, #ffffff 0%, #e9e9ec 100%); color: #0b0b0d; }
 .bg-primary:hover { background-image: linear-gradient(180deg, #ffffff 0%, #f3f3f5 100%); }
-.ring-brand-grad { box-shadow: 0 0 0 1px rgba(255,143,107,.45), 0 0 0 4px rgba(255,106,61,.10); }
+.ring-brand-grad { box-shadow: 0 0 0 1px rgba(255,125,156,.45), 0 0 0 4px rgba(255,79,123,.10); }
 .glass { background: linear-gradient(180deg, rgba(255,255,255,.04), rgba(255,255,255,.015)); border: 1px solid rgba(255,255,255,.07); box-shadow: inset 0 1px 0 rgba(255,255,255,.04); backdrop-filter: blur(20px); }
 .checker { background-image: conic-gradient(#1a1a1d 25%, #141416 0 50%, #1a1a1d 0 75%, #141416 0); background-size: 16px 16px; }
 .noise::after { content: ''; position: absolute; inset: 0; pointer-events: none; opacity: .035; background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.9' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E"); }
@@ -45,7 +45,7 @@ button, a { -webkit-user-drag: none; }
 /* Transition previews: two tiny "screens"; paused mid-way until hovered or selected */
 .trp { position: absolute; inset: 0; }
 .trp-a { background: linear-gradient(135deg, #26262b, #34343b); }
-.trp-b { background: linear-gradient(160deg, #ff8f6b, #e8542c); }
+.trp-b { background: linear-gradient(160deg, #ff7d9c, #e0375f); }
 .trp::before, .trp::after { content: ''; position: absolute; left: 14%; height: 9%; border-radius: 99px; background: rgba(255,255,255,.4); }
 .trp::before { top: 24%; width: 48%; }
 .trp::after { top: 42%; width: 30%; opacity: .7; }
@@ -88,10 +88,10 @@ button, a { -webkit-user-drag: none; }
 .orb { padding: 1.5px; background: linear-gradient(140deg, rgba(255,255,255,.22), rgba(255,255,255,.06)); }
 .orb-pro { padding: 2px; background: conic-gradient(from 210deg, #f3dfbd, #d9b27a, #8a6630, #d9b27a, #f3dfbd); box-shadow: 0 0 18px -6px rgba(217, 178, 122, .5); }
 .pro-card { background: linear-gradient(160deg, rgba(217,178,122,.08), rgba(255,255,255,.02) 50%, rgba(217,178,122,.05)) padding-box, linear-gradient(140deg, rgba(243,223,189,.55), rgba(255,255,255,.08) 50%, rgba(217,178,122,.4)) border-box; border: 1px solid transparent; }
-.account-aurora { background: radial-gradient(60% 120% at 0% 0%, rgba(255,122,79,.12), transparent 60%), radial-gradient(60% 120% at 100% 100%, rgba(255,255,255,.05), transparent 60%); animation: drift 18s ease-in-out infinite alternate; }
+.account-aurora { background: radial-gradient(60% 120% at 0% 0%, rgba(255,95,135,.12), transparent 60%), radial-gradient(60% 120% at 100% 100%, rgba(255,255,255,.05), transparent 60%); animation: drift 18s ease-in-out infinite alternate; }
 
 /* ---- walkthrough ---- */
-.tour-hole { box-shadow: 0 0 0 9999px rgba(5,5,6,.68), 0 0 0 1.5px rgba(255,143,107,.85), 0 0 32px 4px rgba(255,106,61,.28); }
+.tour-hole { box-shadow: 0 0 0 9999px rgba(5,5,6,.68), 0 0 0 1.5px rgba(255,125,156,.85), 0 0 32px 4px rgba(255,79,123,.28); }
 .tour-kbd { display: inline-block; padding: 0 5px; margin: 0 1px; border-radius: 5px; border: 1px solid rgba(255,255,255,.14); background: rgba(255,255,255,.06); font: 600 11px/17px Inter Variable, system-ui; color: #e4e4e7; }
 
 /* ---- a home that breathes ---- */

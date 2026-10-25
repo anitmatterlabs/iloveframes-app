@@ -68,13 +68,13 @@ function RunningView({ p, stage, startedAt, onCancel }: { p: number; stage: stri
   return (
     <div className="relative flex flex-col items-center px-6 pb-7 pt-6">
       <div className="relative h-32 w-32">
-        <div className="absolute inset-3 rounded-full bg-[radial-gradient(closest-side,rgba(255,106,61,.15),transparent)]" />
+        <div className="absolute inset-3 rounded-full bg-[radial-gradient(closest-side,rgba(255,79,123,.15),transparent)]" />
         <svg viewBox="0 0 100 100" className="h-full w-full -rotate-90">
           <defs>
             <linearGradient id="xg" x1="0" x2="1" y1="0" y2="1">
-              <stop stopColor="#ffd2bf" />
-              <stop offset=".5" stopColor="#ff8f6b" />
-              <stop offset="1" stopColor="#ec5329" />
+              <stop stopColor="#ffd0dc" />
+              <stop offset=".5" stopColor="#ff7d9c" />
+              <stop offset="1" stopColor="#e0375f" />
             </linearGradient>
           </defs>
           <circle cx="50" cy="50" r={R} stroke="rgba(255,255,255,.06)" strokeWidth="5" fill="none" />
@@ -166,8 +166,8 @@ export function ExportDialog({ open, onClose }: { open: boolean; onClose: () => 
             layout
             className="relative w-[440px] overflow-hidden rounded-2xl border border-white/10 bg-[#101016] shadow-[0_40px_120px_-20px_rgba(0,0,0,.9)]"
           >
-            <div className="pointer-events-none absolute -top-24 left-[30%] h-48 w-72 -translate-x-1/2 rounded-full bg-[radial-gradient(closest-side,rgba(255,106,61,.16),transparent)]" />
-            <div className="pointer-events-none absolute -top-24 left-[70%] h-48 w-72 -translate-x-1/2 rounded-full bg-[radial-gradient(closest-side,rgba(255,236,224,.08),transparent)]" />
+            <div className="pointer-events-none absolute -top-24 left-[30%] h-48 w-72 -translate-x-1/2 rounded-full bg-[radial-gradient(closest-side,rgba(255,79,123,.16),transparent)]" />
+            <div className="pointer-events-none absolute -top-24 left-[70%] h-48 w-72 -translate-x-1/2 rounded-full bg-[radial-gradient(closest-side,rgba(255,232,238,.08),transparent)]" />
             <div className="relative flex items-center justify-between px-6 pt-5">
               <div className="text-[15px] font-semibold text-white">Export</div>
               {phase.kind !== 'running' && (
@@ -184,7 +184,7 @@ export function ExportDialog({ open, onClose }: { open: boolean; onClose: () => 
                     { v: 'mp4', icon: FileVideo, t: 'MP4 video', d: 'H.264 · best for sharing' },
                     { v: 'gif', icon: ImageIcon, t: 'GIF', d: 'Silent loop · docs & READMEs' }
                   ] as const).map((f) => (
-                    <button key={f.v} onClick={() => setFormat(f.v)} className={cn('rounded-xl border p-3.5 text-left transition-all', format === f.v ? 'border-brand-orchid/50 bg-brand-soft shadow-[0_0_0_3px_rgba(255,143,107,.08)]' : 'border-white/[0.07] bg-white/[0.02] hover:border-white/15')}>
+                    <button key={f.v} onClick={() => setFormat(f.v)} className={cn('rounded-xl border p-3.5 text-left transition-all', format === f.v ? 'border-brand-orchid/50 bg-brand-soft shadow-[0_0_0_3px_rgba(255,125,156,.08)]' : 'border-white/[0.07] bg-white/[0.02] hover:border-white/15')}>
                       <f.icon className={cn('h-5 w-5', format === f.v ? 'text-brand-rose' : 'text-zinc-500')} />
                       <div className="mt-2 text-[13px] font-medium text-zinc-100">{f.t}</div>
                       <div className="text-[11px] text-zinc-500">{f.d}</div>

@@ -78,7 +78,7 @@ function AccountPage() {
         <ProTag />
       </Titlebar>
       <div className="relative min-h-0 flex-1 overflow-y-auto px-6 py-10">
-        <div className="aurora-a pointer-events-none absolute left-1/2 top-0 h-[360px] w-[700px] -translate-x-1/2 rounded-full bg-[radial-gradient(closest-side,rgba(255,236,224,.048),transparent)]" />
+        <div className="aurora-a pointer-events-none absolute left-1/2 top-0 h-[360px] w-[700px] -translate-x-1/2 rounded-full bg-[radial-gradient(closest-side,rgba(255,232,238,.048),transparent)]" />
         <div className="relative">
           <AccountPanel />
         </div>
