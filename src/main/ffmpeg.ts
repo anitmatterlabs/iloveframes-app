@@ -122,7 +122,7 @@ export function streamFrames(args: string[], frameBytes: number, onFrame: (frame
     if (handle?.cancelled) return reject(new CancelledError())
     const proc = spawn(ffmpegPath(), ['-hide_banner', '-nostdin', ...args, 'pipe:1'], { windowsHide: true })
     if (handle) handle.proc = proc
-    let pending = Buffer.alloc(0)
+    let pending: Buffer = Buffer.alloc(0)
     let n = 0
     let tail = ''
     proc.stdout.on('data', (d: Buffer) => {
