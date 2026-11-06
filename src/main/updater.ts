@@ -5,6 +5,7 @@ import { join } from 'path'
 import { tmpdir } from 'os'
 import { CONFIG } from './config'
 import { platform } from './platform'
+import { track } from './telemetry'
 
 /**
  * Over-the-air updates for Windows and macOS.
@@ -22,12 +23,14 @@ export type UpdateState =
   | { kind: 'none'; version: string }
   | { kind: 'downloading'; version: string; p: number }
   | { kind: 'ready'; version: string; notes: string }
-  | { kind: 'manual'; version: string; notes: string; url: string }
+  | { kind: 'manual'; version: string; notes: string; url: string; reason?: string }
   | { kind: 'error'; message: string }
 
 let st: UpdateState = { kind: 'idle' }
 let readyFile: string | null = null
+let readyVersion = ''
 let busy = false
+const DOWNLOAD_PAGE = 'https://iloveframes.app/download/'
 
 const push = (s: UpdateState) => {
   st = s
@@ -101,10 +104,21 @@ export async function checkForUpdates(manual = false) {
     if (!asset) return push({ kind: 'none', version: app.getVersion() })
     // the portable .exe can't replace itself: point people at the download instead
     if (process.env.PORTABLE_EXECUTABLE_FILE) return push({ kind: 'manual', version: m.version, notes: m.notes ?? '', url: asset.url })
+    // a Mac app still running from Downloads / the disk image can't swap itself either
+    const blocker = await platform.updateBlocker()
+    if (blocker) {
+      track('update_blocked', { to: m.version, why: blocker.slice(0, 40) })
+      return push({ kind: 'manual', version: m.version, notes: m.notes ?? '', url: DOWNLOAD_PAGE, reason: blocker })
+    }
+    if (readyFile && readyVersion === m.version) return push({ kind: 'ready', version: m.version, notes: m.notes ?? '' })
+    const t0 = Date.now()
     readyFile = await download(asset.url, asset.sha512, m.version)
+    readyVersion = m.version
+    track('update_downloaded', { to: m.version, ms: Date.now() - t0 })
     push({ kind: 'ready', version: m.version, notes: m.notes ?? '' })
     if (process.env.ILF_AUTO_INSTALL === '1') await installNow()
   } catch (e: any) {
+    track('update_failed', { msg: String(e?.message ?? e).slice(0, 100), manual })
     push(manual ? { kind: 'error', message: e?.message ?? String(e) } : { kind: 'idle' })
   } finally {
     busy = false
@@ -113,7 +127,14 @@ export async function checkForUpdates(manual = false) {
 
 export async function installNow() {
   if (!readyFile) return
-  await platform.installUpdate(readyFile)
+  track('update_install', { to: readyVersion })
+  try {
+    await platform.installUpdate(readyFile)
+  } catch (e: any) {
+    track('update_failed', { msg: String(e?.message ?? e).slice(0, 100), stage: 'install' })
+    readyFile = null
+    push({ kind: 'error', message: (e?.message ?? String(e)) + ' You can download the latest version from iloveframes.app.' })
+  }
 }
 
 export function startAutoUpdates() {

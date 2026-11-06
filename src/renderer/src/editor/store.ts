@@ -1,6 +1,7 @@
 import { create } from 'zustand'
 import type { EditState, MediaSource, Project, Transition, ZoomSegment } from '@/engine/types'
-import { clipLen, rippleInsert, rippleRemove, seqDuration, seqStarts, splitClips } from '@/engine/sequence'
+import { clipAt, clipLen, rippleInsert, rippleRemove, seqDuration, seqStarts, splitClips, trackOf } from '@/engine/sequence'
+import { actionPointAt } from '@/lib/activity'
 import { uid } from '@/engine/types'
 import { track, trackOncePerSession } from '@/lib/telemetry'
 import { autoZoomSegments } from '@/engine/motion'
@@ -94,7 +95,11 @@ export function addSegmentAt(t: number, len = 3) {
     if (s.start > start && s.start < end) end = s.start - 0.05
   }
   if (end - start < 0.8) return
-  const seg: ZoomSegment = { id: uid(), start, end, scale: 1.5, follow: true, x: 0.5, y: 0.5 }
+  // a plain video has no cursor to follow: aim at where things move (or the centre) instead
+  const hit = clipAt(edit.clips, start + Math.min(0.8, (end - start) / 2))
+  const plain = !!hit && !trackOf(project, hit.clip.source)
+  const at = plain ? actionPointAt(project, edit, start + Math.min(0.8, (end - start) / 2)) ?? { x: 0.5, y: 0.5 } : { x: 0.5, y: 0.5 }
+  const seg: ZoomSegment = { id: uid(), start, end, scale: 1.5, follow: !plain, x: at.x, y: at.y }
   track('zoom_added')
   updateEdit((e) => ({ ...e, zoom: { ...e.zoom, segments: [...e.zoom.segments, seg].sort((a, b) => a.start - b.start) } }))
   useEditor.getState().select(seg.id)

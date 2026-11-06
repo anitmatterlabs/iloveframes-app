@@ -57,6 +57,8 @@ export interface MediaSource {
   width: number
   height: number
   hasAudio: boolean
+  /** audio-only copy of the file's sound (lighter to decode at export) */
+  audioFile?: string | null
   /** set when the file is an iloveframes recording: smart zoom + cursor work on it */
   recId?: string
   track?: SourceTrack
@@ -147,7 +149,8 @@ export interface Project {
   name: string
   createdAt: number
   mode: 'auto' | 'manual'
-  engine: 'native' | 'browser'
+  /** how the main video was made: captured natively, by the browser fallback, or imported from a file */
+  engine: 'native' | 'browser' | 'import'
   cursorBaked: boolean
   display: { width: number; height: number; scaleFactor: number }
   duration: number
@@ -160,6 +163,8 @@ export interface Project {
   sources?: MediaSource[]
   /** true when screen.mp4 carries its own audio (imported-video projects) */
   screenAudio?: boolean
+  /** audio-only copy of the main video's sound, when it has one */
+  screenAudioFile?: string | null
   /** file name of the main recording (ilfsrec_NNN.mp4); older projects use screen.mp4 */
   screenFile?: string
   recId?: string
@@ -173,6 +178,17 @@ export interface ProjectSummary {
   mode: 'auto' | 'manual'
   dir: string
   thumb: string | null
+  /** a screen recording, or a project made from your own video files */
+  kind?: 'recording' | 'video'
+  clips?: number
+  edited?: boolean
+}
+
+/** Motion analysis of a plain video: per frame [t, changed share, cx, cy, x0, y0, x1, y1]. */
+export interface Activity {
+  v: 2
+  fps: number
+  frames: number[][]
 }
 
 export const mediaUrl = (abs: string) => 'ilf://media/' + encodeURIComponent(abs)

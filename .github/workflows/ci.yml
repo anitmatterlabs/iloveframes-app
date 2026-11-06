@@ -1,0 +1,54 @@
+# Checks every push and pull request: type check + production build on Linux,
+# and a real macOS package (unpacked, ad-hoc signed) so Mac-only build steps
+# like signing the bundled ffmpeg are exercised before a release.
+name: CI
+
+on:
+  push:
+    branches: ['**']
+    paths-ignore: ['**.md']
+  pull_request:
+  workflow_dispatch:
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - name: Install dependencies
+        run: npm ci
+      - name: Type check
+        run: npm run typecheck
+      - name: Build
+        run: npx electron-vite build
+
+  mac-package:
+    needs: check
+    runs-on: macos-14
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - name: Install dependencies
+        run: npm ci
+      - name: Build app
+        run: npx electron-vite build
+      - name: Package (unpacked .app, ad-hoc signed)
+        run: npx electron-builder --mac --arm64 --dir --publish never
+      - name: Bundled ffmpeg runs from the signed app
+        run: |
+          APP=$(ls -d release/*/mac-arm64/*.app | head -n 1)
+          FF=$(find "$APP" -path '*ffmpeg-static/ffmpeg' -type f | head -n 1)
+          codesign --verify --verbose=2 "$FF"
+          "$FF" -hide_banner -f avfoundation -list_devices true -i '' 2>&1 | head -n 20 || true
+          "$FF" -hide_banner -encoders | grep -E 'h264_videotoolbox|libx264'

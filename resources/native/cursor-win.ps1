@@ -1,4 +1,6 @@
 # Prints the system cursor type (arrow|hand|text) whenever it changes.
+# The first argument is the app's pid: the helper exits once that process is gone.
+param([int]$ParentPid = 0)
 Add-Type @"
 using System; using System.Runtime.InteropServices;
 public class IlfCursor {
@@ -12,8 +14,11 @@ public class IlfCursor {
 $hand = [IlfCursor]::LoadCursor([IntPtr]::Zero, 32649)
 $ibeam = [IlfCursor]::LoadCursor([IntPtr]::Zero, 32513)
 $last = ''
+$tick = 0
 [Console]::Out.WriteLine('ready'); [Console]::Out.Flush()
 while ($true) {
+  $tick++
+  if ($ParentPid -gt 0 -and ($tick % 80) -eq 0 -and -not (Get-Process -Id $ParentPid -ErrorAction SilentlyContinue)) { exit 0 }
   $h = [IlfCursor]::Current()
   $t = if ($h -eq $hand) { 'hand' } elseif ($h -eq $ibeam) { 'text' } else { 'arrow' }
   if ($t -ne $last) { [Console]::Out.WriteLine($t); [Console]::Out.Flush(); $last = $t }

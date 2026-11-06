@@ -384,7 +384,7 @@ function UpdatesCard() {
     : st.kind === 'none' ? 'You’re on the latest version.'
     : st.kind === 'downloading' ? `Downloading ${st.version}… ${Math.round(st.p * 100)}%`
     : st.kind === 'ready' ? `Version ${st.version} is ready to install.`
-    : st.kind === 'manual' ? `Version ${st.version} is available.`
+    : st.kind === 'manual' ? `Version ${st.version} is available.${st.reason ? ' ' + st.reason : ''}`
     : st.kind === 'error' ? st.message
     : 'Updates install automatically in the background.'
   return (
@@ -397,7 +397,7 @@ function UpdatesCard() {
         {st.kind === 'ready' ? (
           <Button variant="primary" size="sm" onClick={() => window.ilf.updates.install()}><Download className="h-3.5 w-3.5" /> Restart &amp; update</Button>
         ) : st.kind === 'manual' ? (
-          <Button variant="primary" size="sm" onClick={() => window.open(st.url)}><Download className="h-3.5 w-3.5" /> Download</Button>
+          <Button variant="primary" size="sm" className="shrink-0" onClick={() => window.open(st.url)}><Download className="h-3.5 w-3.5" /> Download</Button>
         ) : (
           <Button variant="secondary" size="sm" disabled={st.kind === 'checking' || st.kind === 'downloading'} onClick={() => window.ilf.updates.check()}>
             <RefreshCw className={cn('h-3.5 w-3.5', st.kind === 'checking' && 'animate-spin')} /> Check now
@@ -456,14 +456,21 @@ export function UpdateToast() {
       off()
     }
   }, [])
-  const show = !hide && st.kind === 'ready'
+  const show = !hide && (st.kind === 'ready' || st.kind === 'manual')
   return (
     <AnimatePresence>
       {show && (
-        <motion.div initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: 12 }} className="fixed bottom-5 left-5 z-[90] flex items-center gap-3 rounded-2xl border border-white/10 bg-ink-850/95 py-2.5 pl-4 pr-2.5 shadow-2xl backdrop-blur-xl">
-          <Download className="h-4 w-4 text-brand-lilac" />
-          <span className="text-[12.5px] text-zinc-200">iloveframes {st.version} is ready</span>
-          <Button variant="primary" size="sm" onClick={() => window.ilf.updates.install()}>Restart</Button>
+        <motion.div initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: 12 }} className="fixed bottom-5 left-5 z-[90] flex max-w-[460px] items-center gap-3 rounded-2xl border border-white/10 bg-ink-850/95 py-2.5 pl-4 pr-2.5 shadow-2xl backdrop-blur-xl">
+          <Download className="h-4 w-4 shrink-0 text-brand-lilac" />
+          <span className="text-[12.5px] text-zinc-200" title={st.reason || ''}>
+            iloveframes {st.version} is {st.kind === 'ready' ? 'ready' : 'available'}
+            {st.kind === 'manual' && st.reason && <span className="mt-0.5 block text-[11px] leading-snug text-zinc-500">{st.reason}</span>}
+          </span>
+          {st.kind === 'ready' ? (
+            <Button variant="primary" size="sm" className="shrink-0" onClick={() => window.ilf.updates.install()}>Restart</Button>
+          ) : (
+            <Button variant="primary" size="sm" className="shrink-0" onClick={() => window.open(st.url)}>Download</Button>
+          )}
           <button onClick={() => setHide(true)} className="grid h-7 w-7 place-items-center rounded-lg text-zinc-500 hover:bg-white/10 hover:text-white"><X className="h-3.5 w-3.5" /></button>
         </motion.div>
       )}

@@ -36,7 +36,8 @@ export const win: Platform = {
   },
 
   cursorWatcher(nativeDir) {
-    return { cmd: 'powershell.exe', args: ['-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', join(nativeDir, 'cursor-win.ps1')] }
+    // the parent pid lets the helper exit on its own if the app ever dies without stopping it
+    return { cmd: 'powershell.exe', args: ['-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', join(nativeDir, 'cursor-win.ps1'), String(process.pid)] }
   },
 
   async machineId() {
@@ -56,6 +57,10 @@ export const win: Platform = {
   },
 
   updateAsset: () => 'win',
+
+  async updateBlocker() {
+    return null
+  },
 
   async installUpdate(file, relaunch = true) {
     // Same approach as electron-updater: hand straight to the NSIS installer.

@@ -8,8 +8,9 @@
  *    "still here" ping every 15 minutes while the app is open, and a goodbye when it quits
  *  - installs that turned it off in 1.0.5 / 1.0.6 (optOut) stay off
  */
-import { app, ipcMain, net } from 'electron'
+import { app, ipcMain, net, screen } from 'electron'
 import { randomUUID } from 'crypto'
+import { cpus, totalmem } from 'os'
 import { existsSync, readFileSync, writeFileSync } from 'fs'
 import { join } from 'path'
 import { CONFIG } from './config'
@@ -79,6 +80,12 @@ export function track(name: string, props?: Record<string, unknown>) {
   saveSoon()
 }
 
+/** An error with where it happened; the message is trimmed and any file paths are masked by clean(). */
+export function trackError(where: string, err: unknown, props?: Record<string, unknown>) {
+  const msg = String((err as any)?.message ?? err ?? 'unknown').slice(0, 120)
+  track('error', { ...props, where, msg })
+}
+
 /** Record a one-off milestone only the first time it happens on this install. */
 export function trackOnce(flag: string, name: string, props?: Record<string, unknown>) {
   if (!s || s.flags[flag]) return
@@ -143,6 +150,15 @@ export function setOptOut(off: boolean) {
   return { optOut: s.optOut }
 }
 
+/** Total memory of all app processes in MB (main, renderers, GPU), sampled for the session report. */
+let peakMb = 0
+function sampleMemory() {
+  try {
+    const kb = app.getAppMetrics().reduce((a, m) => a + (m.memory?.workingSetSize || 0), 0)
+    peakMb = Math.max(peakMb, Math.round(kb / 1024))
+  } catch {}
+}
+
 export function initTelemetry(o: { license: () => string }) {
   s = load()
   licenseState = o.license
@@ -153,7 +169,18 @@ export function initTelemetry(o: { license: () => string }) {
   s.lastVersion = version
   track('app_open')
   markActiveDay()
+  // the machine, once per version: helps tell "slow on old Intel Macs" from "slow everywhere"
+  trackOnce('sys:' + version, 'system_info', {
+    osv: process.getSystemVersion?.() ?? '',
+    cpus: cpus().length,
+    cpu: (cpus()[0]?.model ?? '').replace(/\s+/g, ' ').slice(0, 60),
+    memGb: Math.round(totalmem() / 1073741824),
+    displays: screen.getAllDisplays().length,
+    sf: screen.getPrimaryDisplay().scaleFactor
+  })
   saveNow()
+  setInterval(sampleMemory, 60_000)
+  setTimeout(sampleMemory, 20_000)
 
   ipcMain.on('telemetry:track', (_e, name: unknown, props: unknown) => {
     if (typeof name === 'string') track(name, props && typeof props === 'object' ? (props as Record<string, unknown>) : undefined)
@@ -172,6 +199,7 @@ export function initTelemetry(o: { license: () => string }) {
   app.on('browser-window-created', () => setAway(false))
 
   process.on('uncaughtException', (err) => track('error', { msg: String(err?.message || err).slice(0, 120), where: 'main' }))
+  process.on('unhandledRejection', (err: any) => track('error', { msg: String(err?.message || err).slice(0, 120), where: 'main_promise' }))
   app.on('render-process-gone', (_e, _wc, d) => track('crash', { msg: d.reason, code: d.exitCode }))
   app.on('child-process-gone', (_e, d) => {
     if (d.reason !== 'clean-exit' && d.reason !== 'killed') track('crash', { msg: `${d.type}: ${d.reason}`, code: d.exitCode })
@@ -182,7 +210,8 @@ export function initTelemetry(o: { license: () => string }) {
   app.on('before-quit', (e) => {
     if (quitting || s.optOut || !ENABLED()) return
     quitting = true
-    track('app_session', { ms: Date.now() - startedAt })
+    sampleMemory()
+    track('app_session', { ms: Date.now() - startedAt, peakMb })
     e.preventDefault()
     flush({ timeoutMs: 2500, bye: true }).finally(() => app.quit())
   })

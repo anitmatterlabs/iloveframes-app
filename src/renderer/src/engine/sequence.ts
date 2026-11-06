@@ -16,6 +16,8 @@ export interface SourceInfo {
   width: number
   height: number
   hasAudio: boolean
+  /** audio-only copy of the source's sound, when there is one (cheaper to decode than the video) */
+  audioUrl?: string
   isMain: boolean
 }
 
@@ -23,16 +25,17 @@ export function sourceInfo(project: Project, id: string): SourceInfo | null {
   if (id === MAIN)
     return {
       id: MAIN,
-      name: 'Recording',
+      name: project.engine === 'import' ? 'Video' : 'Recording',
       url: projectFile(project, project.screenFile ?? 'screen.mp4'),
       duration: project.duration,
       width: Math.round(project.display.width * project.display.scaleFactor),
       height: Math.round(project.display.height * project.display.scaleFactor),
       hasAudio: !!project.screenAudio,
+      audioUrl: project.screenAudio && project.screenAudioFile ? projectFile(project, project.screenAudioFile) : undefined,
       isMain: true
     }
   const s = project.sources?.find((x) => x.id === id)
-  return s ? { ...s, url: projectFile(project, s.file), isMain: false } : null
+  return s ? { ...s, url: projectFile(project, s.file), audioUrl: s.hasAudio && s.audioFile ? projectFile(project, s.audioFile) : undefined, isMain: false } : null
 }
 
 export const clipLen = (c: SeqClip) => Math.max(0, c.out - c.in)

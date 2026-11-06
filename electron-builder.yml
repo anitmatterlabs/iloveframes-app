@@ -56,6 +56,12 @@ mac:
     NSCameraUsageDescription: iloveframes uses your camera for the selfie bubble in recordings.
     NSMicrophoneUsageDescription: iloveframes records your voice-over.
     NSScreenCaptureUsageDescription: iloveframes records your screen to create walkthrough videos.
+  # "Open With → iloveframes" and dropping videos on the Dock icon (never takes over as the default app)
+  fileAssociations:
+    - ext: [mp4, mov, m4v, webm, mkv, avi]
+      name: Video
+      role: Viewer
+      rank: Alternate
 dmg:
   title: iloveframes
   iconSize: 96

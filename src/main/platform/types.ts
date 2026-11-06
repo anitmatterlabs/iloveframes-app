@@ -21,6 +21,11 @@ export interface Platform {
   updateAsset(): string
   /** Hand a verified update file to the OS installer, then quit and relaunch. */
   installUpdate(file: string, relaunch?: boolean): Promise<void>
+  /**
+   * Why this copy can't replace itself (e.g. a Mac app still running from the
+   * Downloads folder or the disk image), or null when in-app updates work.
+   */
+  updateBlocker(): Promise<string | null>
   /** Human label for the stop-recording shortcut. */
   stopShortcutLabel: string
 }

@@ -172,7 +172,8 @@ export async function exportProject(
     const sourceAudio = new Map<string, AudioBuffer>()
     for (const src of used) {
       if (!src.hasAudio) continue
-      const b = await decodeUrl(src.url)
+      // the audio-only copy is a fraction of the size: decoding the whole video just for its sound can run out of memory
+      const b = (src.audioUrl ? await decodeUrl(src.audioUrl) : null) ?? (await decodeUrl(src.url))
       if (b) sourceAudio.set(src.id, b)
     }
     ac.close()

@@ -19,7 +19,10 @@ export class InputTracker {
   private hook: any = null
   private lastX = -1
   private lastY = -1
-  ignoreRects: Rectangle[] = []
+  /** screen areas whose clicks aren't part of the demo (our own control bar), read on every click so it can be dragged */
+  ignoreRects: () => Rectangle[] = () => []
+  /** whether clicks / keys could be captured (macOS needs Accessibility) */
+  hooked = false
 
   constructor(private display: Display) {}
 
@@ -75,13 +78,18 @@ export class InputTracker {
         uIOhook.removeAllListeners()
         uIOhook.on('mousedown', (e: any) => {
           const p = screen.getCursorScreenPoint()
-          if (this.ignoreRects.some((r) => p.x >= r.x && p.y >= r.y && p.x <= r.x + r.width && p.y <= r.y + r.height)) return
+          let skip: Rectangle[] = []
+          try {
+            skip = this.ignoreRects()
+          } catch {}
+          if (skip.some((r) => p.x >= r.x && p.y >= r.y && p.x <= r.x + r.width && p.y <= r.y + r.height)) return
           const [x, y] = this.norm(p)
           if (x < 0 || y < 0 || x > 1 || y > 1) return
           this.events.clicks.push([Date.now(), x, y, e.button ?? 1])
         })
         uIOhook.on('keydown', () => this.events.keys.push(Date.now()))
         uIOhook.start()
+        this.hooked = true
       } catch (err) {
         console.warn('[iloveframes] global input hook unavailable', err)
         this.hook = null

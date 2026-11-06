@@ -16,6 +16,16 @@ const api = {
   displayThumbs: (): Promise<Record<string, string>> => ipcRenderer.invoke('displays:thumbs'),
   permStatus: () => ipcRenderer.invoke('perm:status'),
   permRequest: (k: string) => ipcRenderer.invoke('perm:request', k),
+  /** macOS: open the Privacy & Security pane for one permission */
+  permOpenSettings: (k: 'screen' | 'accessibility' | 'camera' | 'microphone') => ipcRenderer.invoke('perm:open-settings', k),
+  /** quit and reopen (macOS applies a new Screen Recording permission only after a restart) */
+  relaunch: () => ipcRenderer.invoke('app:relaunch'),
+  /** app menu commands (File → Edit Your Own Video…, Help → Send Feedback…, …) */
+  menu: {
+    onNavigate: (cb: (route: string) => void) => on('menu:navigate', cb),
+    onImportVideo: (cb: () => void) => on('menu:import-video', cb),
+    onFeedback: (cb: () => void) => on('menu:feedback', cb)
+  },
   rec: {
     prepare: (o: any) => ipcRenderer.invoke('rec:prepare', o),
     chunk: (kind: string, data: ArrayBuffer) => ipcRenderer.send('rec:chunk', kind, data),
@@ -51,7 +61,12 @@ const api = {
   media: {
     import: (projectId: string, paths?: string[]): Promise<import('../renderer/src/engine/types').MediaSource[]> => ipcRenderer.invoke('media:import', projectId, paths),
     importAsProject: (paths?: string[]): Promise<string | null> => ipcRenderer.invoke('project:import-video', paths),
-    onProgress: (cb: (p: { label: string; p: number } | null) => void) => on('media:progress', cb)
+    cancelImport: () => ipcRenderer.invoke('media:cancel-import'),
+    /** where things move on screen in a plain video (cached); used for smart zooms without cursor data */
+    activity: (projectId: string, sourceId: string): Promise<import('../renderer/src/engine/types').Activity> => ipcRenderer.invoke('media:activity', projectId, sourceId),
+    /** videos opened with the app (dock drop, "Open with", second launch) */
+    onOpenRequest: (cb: (paths: string[]) => void) => on('media:open-request', cb),
+    onProgress: (cb: (p: { label: string; p: number; i?: number; n?: number; stage?: string } | null) => void) => on('media:progress', cb)
   },
   shot: {
     open: (): Promise<{ dataUrl: string; name: string } | null> => ipcRenderer.invoke('shot:open'),

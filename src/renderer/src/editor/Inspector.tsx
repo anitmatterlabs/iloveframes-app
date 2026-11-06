@@ -1,13 +1,14 @@
 import { useEffect, useMemo, useState } from 'react'
 import { AnimatePresence, motion } from 'framer-motion'
 import {
-  Camera, Check, CircleHelp, Clapperboard, Crop, Crosshair, FilePlus2, Scissors, EyeOff, ImagePlus, X, Upload, Music, GripVertical, Play, Square, Plus, LayoutTemplate, MousePointer2, MousePointerClick, Palette, RotateCcw, Sparkles, Trash2, Volume2, ZoomIn
+  Camera, Check, CircleHelp, Clapperboard, Crop, Crosshair, FilePlus2, Scissors, EyeOff, ImagePlus, X, Upload, Music, GripVertical, Play, Square, Plus, LayoutTemplate, MousePointer2, MousePointerClick, Palette, RotateCcw, Sparkles, Trash2, Volume2, ZoomIn, Loader2, Wand2
 } from 'lucide-react'
 import { useEditor, updateEdit, patchSegment, removeSegment, addSegmentAt, addHideAt, removeHide, cursorPosAt, addClipAt, patchClip, removeClip, splitAtPlayhead, deleteSeqClip, appendSources, setTransition, setAllTransitions } from './store'
 import { player } from './Preview'
 import { GRADIENTS, SOLIDS, WALLPAPERS, backgroundThumb } from '@/engine/backgrounds'
 import { STUDIO } from '@/engine/studio'
-import { autoZoomSegments } from '@/engine/motion'
+import { autoZoomSegments, smartZoomSegments } from '@/engine/motion'
+import { cachedActivity, loadActivity, motionSources } from '@/lib/activity'
 import { playSfx, keyVariant, CLICK_SOUNDS, ZOOM_SOUNDS, TYPING_SOUNDS } from '@/engine/sounds'
 import type { Aspect, CamPos, CursorStyle, DeviceColor, DeviceKind, EditState } from '@/engine/types'
 import { LabeledSlider, Slider } from '@/components/ui/slider'
@@ -38,6 +39,13 @@ const TABS: { id: Tab; icon: any; label: string }[] = [
 ]
 
 const set = (fn: (e: EditState) => EditState, history = true) => updateEdit(fn, history)
+
+/** Import videos as clips; a failure shows as a short note instead of disappearing. */
+const safeImport = (projectId: string, paths?: string[]) =>
+  window.ilf.media
+    .import(projectId, paths)
+    .then(appendSources)
+    .catch((e: any) => window.dispatchEvent(new CustomEvent('ilf:toast', { detail: String(e?.message ?? e).replace(/^Error invoking remote method '[^']+': (Error: )?/, '') })))
 const live = (fn: (e: EditState) => EditState) => updateEdit(fn, false)
 
 export function Section({ title, children, action, tour }: { title: string; children: React.ReactNode; action?: React.ReactNode; tour?: string }) {
@@ -491,12 +499,34 @@ function ZoomPanel({ edit }: { edit: EditState }) {
   const project = useEditor((s) => s.project)!
   const selected = useEditor((s) => s.selected)
   const seg = edit.zoom.segments.find((s) => s.id === selected)
-  const fresh = useMemo(() => autoZoomSegments(project, edit.clips, 1.5, edit.crops), [project, edit.clips, edit.crops])
+  // plain videos (no cursor data) get their zooms from motion analysis, run on demand
+  const plainIds = useMemo(() => motionSources(project, edit.clips), [project, edit.clips])
+  const [act, setAct] = useState(() => cachedActivity(project, edit.clips))
+  const [analyzing, setAnalyzing] = useState(false)
+  const [analyzeErr, setAnalyzeErr] = useState<string | null>(null)
+  useEffect(() => setAct(cachedActivity(project, edit.clips)), [project, edit.clips])
+  const missing = plainIds.filter((id) => !act.has(id))
+  const onlyPlain = plainIds.length > 0 && edit.clips.every((c) => plainIds.includes(c.source))
+  const fresh = useMemo(() => smartZoomSegments(project, edit.clips, 1.5, edit.crops, act), [project, edit.clips, edit.crops, act])
   const sig = (l: { start: number; end: number; scale: number; follow: boolean }[]) => l.map((z) => [z.start.toFixed(2), z.end.toFixed(2), z.scale, z.follow].join(':')).join('|')
-  const upToDate = fresh.length > 0 && sig(fresh) === sig(edit.zoom.segments)
-  const regen = () => {
-    set((e) => ({ ...e, zoom: { ...e.zoom, segments: autoZoomSegments(project, e.clips, 1.5, e.crops) } }))
+  const upToDate = fresh.length > 0 && missing.length === 0 && sig(fresh) === sig(edit.zoom.segments)
+  const regen = (a = act) => {
+    set((e) => ({ ...e, zoom: { ...e.zoom, segments: smartZoomSegments(project, e.clips, 1.5, e.crops, a) } }))
     useEditor.getState().select(null)
+  }
+  const analyze = async () => {
+    setAnalyzing(true)
+    setAnalyzeErr(null)
+    try {
+      const a = await loadActivity(project, useEditor.getState().edit!.clips)
+      setAct(a)
+      regen(a)
+      trackOncePerSession('motion-zoom', 'motion_zoom_generated', { n: smartZoomSegments(project, useEditor.getState().edit!.clips, 1.5, useEditor.getState().edit!.crops, a).length })
+    } catch (e: any) {
+      setAnalyzeErr(e?.message ?? String(e))
+    } finally {
+      setAnalyzing(false)
+    }
   }
   return (
     <>
@@ -536,18 +566,33 @@ function ZoomPanel({ edit }: { edit: EditState }) {
         <Section title="Zoom" tour="zoom-main">
           <div className="rounded-xl border border-white/[0.06] bg-gradient-to-br from-brand-pink/[0.07] to-brand-violet/[0.06] p-4">
             <div className="flex items-center gap-2 text-[12.5px] font-medium text-zinc-200"><Sparkles className="h-4 w-4 text-brand-lilac" /> Auto zoom</div>
-            <p className="mt-1.5 text-[11.5px] leading-relaxed text-zinc-400">Generates smooth zoom-ins around your clicks and typing, following the cursor.</p>
-            {upToDate ? (
+            <p className="mt-1.5 text-[11.5px] leading-relaxed text-zinc-400">
+              {onlyPlain
+                ? 'Finds where things happen in your video (menus opening, typing, buttons reacting) and zooms in on them.'
+                : plainIds.length
+                  ? 'Zooms around your clicks and typing, and finds the action in imported videos.'
+                  : 'Generates smooth zoom-ins around your clicks and typing, following the cursor.'}
+            </p>
+            {analyzing ? (
+              <div className="mt-3 flex h-8 items-center justify-center gap-2 rounded-lg bg-white/[0.04] text-[12px] text-zinc-300">
+                <Loader2 className="h-3.5 w-3.5 animate-spin text-brand-lilac" /> Finding the action…
+              </div>
+            ) : missing.length > 0 ? (
+              <Button variant="primary" size="sm" className="mt-3 w-full" onClick={analyze}>
+                <Wand2 className="h-3.5 w-3.5" /> {onlyPlain ? 'Find the action & zoom' : 'Analyse videos & generate zooms'}
+              </Button>
+            ) : upToDate ? (
               <div className="mt-3 flex h-8 items-center justify-center gap-1.5 rounded-lg border border-brand-orchid/25 bg-brand-orchid/[0.08] text-[12px] font-medium text-brand-lilac">
                 <Check className="h-3.5 w-3.5" /> Auto zooms are up to date
               </div>
             ) : fresh.length === 0 ? (
-              <div className="mt-3 flex h-8 items-center justify-center rounded-lg bg-white/[0.03] text-[11.5px] text-zinc-500">No clicks or typing found to zoom into</div>
+              <div className="mt-3 flex h-8 items-center justify-center rounded-lg bg-white/[0.03] text-[11.5px] text-zinc-500">{onlyPlain ? 'Not much happening on screen to zoom into' : 'No clicks or typing found to zoom into'}</div>
             ) : (
-              <Button variant="primary" size="sm" className="mt-3 w-full" onClick={regen}>
+              <Button variant="primary" size="sm" className="mt-3 w-full" onClick={() => regen()}>
                 <Sparkles className="h-3.5 w-3.5" /> {edit.zoom.segments.some((s) => s.auto) ? 'Regenerate' : 'Generate'} auto zooms
               </Button>
             )}
+            {analyzeErr && <div className="mt-2 text-[11px] leading-snug text-red-300">{analyzeErr}</div>}
           </div>
           <Button variant="outline" size="sm" className="w-full" onClick={() => addSegmentAt(useEditor.getState().time)}>
             <ZoomIn className="h-3.5 w-3.5" /> Add zoom at playhead
@@ -924,7 +969,7 @@ function ClipsPanel({ edit }: { edit: EditState }) {
         tour="clips-media"
         title={'Project media · ' + all.length}
         action={
-          <Button variant="ghost" size="sm" onClick={() => window.ilf.media.import(project.id).then(appendSources)}>
+          <Button variant="ghost" size="sm" onClick={() => safeImport(project.id)}>
             <FilePlus2 className="h-3.5 w-3.5" /> Import
           </Button>
         }
@@ -940,7 +985,7 @@ function ClipsPanel({ edit }: { edit: EditState }) {
             e.preventDefault()
             setOver(false)
             const paths = [...e.dataTransfer.files].map((f) => window.ilf.pathForFile(f)).filter((x) => /\.(mp4|mov|m4v|webm|mkv|avi)$/i.test(x))
-            if (paths.length) window.ilf.media.import(project.id, paths).then(appendSources)
+            if (paths.length) safeImport(project.id, paths)
           }}
           className={cn('space-y-2 rounded-xl transition-colors', over && 'bg-brand-orchid/[0.06] ring-1 ring-brand-orchid/40')}
         >
@@ -961,7 +1006,7 @@ function ClipsPanel({ edit }: { edit: EditState }) {
               }
             />
           ))}
-          <button onClick={() => window.ilf.media.import(project.id).then(appendSources)} className="flex w-full flex-col items-center gap-1.5 rounded-xl border border-dashed border-white/10 py-4 text-[12px] text-zinc-400 transition-colors hover:border-white/25 hover:bg-white/[0.02] hover:text-zinc-200">
+          <button onClick={() => safeImport(project.id)} className="flex w-full flex-col items-center gap-1.5 rounded-xl border border-dashed border-white/10 py-4 text-[12px] text-zinc-400 transition-colors hover:border-white/25 hover:bg-white/[0.02] hover:text-zinc-200">
             <FilePlus2 className="h-5 w-5" />
             Import videos
             <span className="text-[10.5px] text-zinc-600">MP4, MOV, WebM, MKV · or drop files here</span>
@@ -1027,7 +1072,7 @@ function RecordingsSection() {
   const add = async (r: RecordingItem) => {
     setBusy(r.id)
     try {
-      appendSources(await window.ilf.media.import(project.id, [r.file]))
+      await safeImport(project.id, [r.file])
     } finally {
       setBusy(null)
     }

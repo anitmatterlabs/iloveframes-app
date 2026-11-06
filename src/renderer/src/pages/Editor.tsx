@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import { AnimatePresence, motion } from 'framer-motion'
-import { ChevronLeft, Crop, Download, FilePlus2, Maximize2, Pause, Play, Redo2, Scissors, SkipBack, SkipForward, SlidersHorizontal, Sparkles, Trash2, Undo2, ZoomIn } from 'lucide-react'
+import { ChevronLeft, Crop, Download, FilePlus2, Film, Maximize2, Pause, Play, Redo2, Scissors, SkipBack, SkipForward, SlidersHorizontal, Sparkles, Trash2, Undo2, ZoomIn } from 'lucide-react'
 import { Titlebar, LogoMark } from '@/components/Brand'
 import { Button } from '@/components/ui/button'
 import { Tip } from '@/components/ui/tooltip'
@@ -9,8 +9,9 @@ import { Preview, player } from '@/editor/Preview'
 import { Timeline } from '@/editor/Timeline'
 import { Inspector } from '@/editor/Inspector'
 import { ExportDialog } from '@/editor/ExportDialog'
-import { migrateEdit, type Project } from '@/engine/types'
-import { autoZoomSegments } from '@/engine/motion'
+import { migrateEdit, uid, type Project } from '@/engine/types'
+import { autoZoomSegments, smartZoomSegments } from '@/engine/motion'
+import { loadActivity } from '@/lib/activity'
 import { cn, fmtTime, modKey } from '@/lib/utils'
 import { seqDuration } from '@/engine/sequence'
 import { AccountBadge } from '@/components/Account'
@@ -86,8 +87,12 @@ function Transport({ onToast }: { onToast: (m: string) => void }) {
           <ToolBtn
             tip="Import video clips"
             onClick={async () => {
-              const added = await importClips(project.id)
-              if (added.length) onToast('Added ' + added.length + ' clip' + (added.length > 1 ? 's' : '') + ' to the end')
+              try {
+                const added = await importClips(project.id)
+                if (added.length) onToast('Added ' + added.length + ' clip' + (added.length > 1 ? 's' : '') + ' to the end')
+              } catch (e: any) {
+                onToast(String(e?.message ?? e).replace(/^Error invoking remote method '[^']+': (Error: )?/, ''))
+              }
             }}
           >
             <FilePlus2 className="h-4 w-4" />
@@ -105,26 +110,50 @@ function Transport({ onToast }: { onToast: (m: string) => void }) {
   )
 }
 
-/** Progress card while videos are being imported / converted. */
+/** Progress card while videos are being imported, converted or analysed. Cancel stops the import. */
 export function ImportProgress() {
-  const [st, setSt] = useState<{ label: string; p: number } | null>(null)
+  const [st, setSt] = useState<{ label: string; p: number; i?: number; n?: number; stage?: string } | null>(null)
+  const [stopping, setStopping] = useState(false)
   useEffect(() => {
-    const off = window.ilf.media.onProgress(setSt)
+    const off = window.ilf.media.onProgress((x) => {
+      setSt(x)
+      if (!x) setStopping(false)
+    })
     return () => {
       off()
     }
   }, [])
+  const cancellable = !!st && st.stage !== 'Finding the action'
   return (
     <AnimatePresence>
       {st && (
-        <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: 10 }} className="fixed bottom-6 left-1/2 z-50 w-[360px] -translate-x-1/2 rounded-2xl border border-white/10 bg-ink-850/95 p-4 shadow-2xl backdrop-blur-xl">
-          <div className="flex items-center justify-between text-[12.5px]">
-            <span className="truncate text-zinc-200">Importing {st.label}</span>
-            <span className="tabular-nums text-zinc-400">{Math.round(st.p * 100)}%</span>
+        <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: 10 }} className="fixed bottom-6 left-1/2 z-50 w-[380px] -translate-x-1/2 rounded-2xl border border-white/10 bg-ink-850/95 p-4 shadow-2xl backdrop-blur-xl">
+          <div className="flex items-center justify-between gap-3 text-[12.5px]">
+            <span className="min-w-0 truncate text-zinc-200">
+              {st.stage ?? 'Importing'} <span className="text-zinc-400">{st.label}</span>
+            </span>
+            <span className="shrink-0 tabular-nums text-zinc-400">{Math.round(st.p * 100)}%</span>
           </div>
           <div className="mt-2.5 h-1.5 overflow-hidden rounded-full bg-white/[0.08]">
             <div className="bg-brand h-full rounded-full transition-[width] duration-300" style={{ width: st.p * 100 + '%' }} />
           </div>
+          {(st.n ?? 1) > 1 || cancellable ? (
+            <div className="mt-2.5 flex items-center justify-between text-[11px] text-zinc-500">
+              <span>{(st.n ?? 1) > 1 ? `Video ${st.i} of ${st.n}` : 'Converting so it scrubs smoothly'}</span>
+              {cancellable && (
+                <button
+                  disabled={stopping}
+                  onClick={() => {
+                    setStopping(true)
+                    window.ilf.media.cancelImport()
+                  }}
+                  className="rounded-md px-2 py-0.5 text-zinc-400 transition-colors hover:bg-white/10 hover:text-white disabled:opacity-50"
+                >
+                  {stopping ? 'Stopping…' : 'Cancel'}
+                </button>
+              )}
+            </div>
+          ) : null}
         </motion.div>
       )}
     </AnimatePresence>
@@ -163,11 +192,32 @@ export default function Editor({ id }: { id: string }) {
         if (dead) return
         const fresh = !p.edit
         const e = migrateEdit(p, p.edit)
-        if (fresh && p.mode === 'auto') e.zoom.segments = autoZoomSegments(p, e.clips)
+        const imported = p.engine === 'import'
+        if (fresh) {
+          // a project made from several videos plays them back to back
+          if (p.sources?.length) e.clips = [...e.clips, ...p.sources.map((src) => ({ id: uid(), source: src.id, in: 0, out: src.duration }))]
+          // phone / portrait footage gets a portrait frame
+          if (imported && p.display.height > p.display.width * 1.1) e.aspect = '9:16'
+          if (p.mode === 'auto') e.zoom.segments = autoZoomSegments(p, e.clips)
+        }
         loadedId.current = p.id
         setName(p.name)
         useEditor.getState().load(p, e)
-        track('project_opened', { fresh, clips: e.clips.length, camera: !!p.camera, mic: !!p.mic, len: Math.round(p.duration), imported: !p.recId })
+        track('project_opened', { fresh, clips: e.clips.length, camera: !!p.camera, mic: !!p.mic, len: Math.round(p.duration), imported: !p.recId, kind: imported ? 'video' : 'recording' })
+        // your own video, opened for the first time: find the action and add smart zooms right away
+        if (fresh && imported) {
+          loadActivity(p, e.clips)
+            .then((act) => {
+              const st = useEditor.getState()
+              if (dead || !st.edit || st.project?.id !== p.id || st.edit.zoom.segments.length) return
+              const segs = smartZoomSegments(p, st.edit.clips, 1.5, st.edit.crops, act)
+              if (!segs.length) return
+              st.update((x) => ({ ...x, zoom: { ...x.zoom, segments: segs } }))
+              flash(`Added ${segs.length} smart zoom${segs.length > 1 ? 's' : ''}. Tweak or clear them in Zoom.`)
+              track('motion_zoom_auto', { n: segs.length, len: Math.round(p.duration) })
+            })
+            .catch(() => {})
+        }
       })
       .catch((err) => setError(String(err?.message ?? err)))
     return () => {
@@ -261,7 +311,7 @@ export default function Editor({ id }: { id: string }) {
           className="no-drag w-[260px] truncate rounded-md bg-transparent px-2 py-1 text-[13px] font-medium text-zinc-100 outline-none transition-colors hover:bg-white/[0.04] focus:bg-white/[0.06]"
         />
         <span className="flex items-center gap-1 rounded-full border border-white/[0.07] bg-white/[0.03] px-2 py-0.5 text-[10.5px] font-medium text-zinc-400">
-          {project.mode === 'auto' ? <><Sparkles className="h-3 w-3 text-brand-lilac" /> Auto</> : <><SlidersHorizontal className="h-3 w-3" /> Manual</>}
+          {project.engine === 'import' ? <><Film className="h-3 w-3 text-brand-lilac" /> Your video</> : project.mode === 'auto' ? <><Sparkles className="h-3 w-3 text-brand-lilac" /> Auto</> : <><SlidersHorizontal className="h-3 w-3" /> Manual</>}
         </span>
         <div className="flex-1" />
         <div className="no-drag flex items-center gap-1">

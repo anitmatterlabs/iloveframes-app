@@ -365,3 +365,156 @@ export function autoZoomSegments(project: Project, clips: SeqClip[], scale = 1.5
     .filter((r) => r.e - r.s >= 1)
     .map((r) => ({ id: uid(), start: +r.s.toFixed(3), end: +r.e.toFixed(3), scale, follow: true, x: r.x, y: r.y, auto: true }))
 }
+
+// ---------------------------------------------------------------------------
+// Smart zoom for plain videos (no cursor / click data): follow the action.
+// ---------------------------------------------------------------------------
+type ActivityFrames = { frames: number[][] }
+
+/**
+ * Turn motion analysis (see main/media.ts) into fixed-point zooms. A small,
+ * steady change somewhere on screen (a menu opening, typing, a button
+ * reacting) gets a zoom framed around it; whole-frame changes (cuts, scrolls)
+ * and spots that never stop moving (a clock, a playing video) are ignored.
+ */
+export function motionZoomSegments(
+  project: Project,
+  clips: SeqClip[],
+  activity: Map<string, ActivityFrames>,
+  crops?: EditState['crops'],
+  maxScale = 2
+): ZoomSegment[] {
+  const dur = seqDuration(clips)
+  type Hit = { t: number; x: number; y: number; w: number; h: number; f: number }
+  type Cut = { t: number }
+  const hits: Hit[] = []
+  const cuts: Cut[] = []
+  for (const id of new Set(clips.map((c) => c.source))) {
+    if (trackOf(project, id)) continue // tracked sources zoom on their real clicks
+    const a = activity.get(id)
+    if (!a?.frames.length) continue
+    const crop = cropOf(crops, id)
+    // spots that move all the time are background, not action
+    const G = 8
+    const heat = new Uint32Array(G * G)
+    const small = a.frames.filter((f) => f[1] >= 0.0015 && f[1] <= 0.22)
+    for (const f of small) heat[Math.min(G - 1, Math.floor(f[3] * G)) * G + Math.min(G - 1, Math.floor(f[2] * G))]++
+    const noisy = (x: number, y: number) => small.length > 40 && heat[Math.min(G - 1, Math.floor(y * G)) * G + Math.min(G - 1, Math.floor(x * G))] > small.length * 0.4
+    for (const f of a.frames) {
+      const [t, frac, cx, cy, x0, y0, x1, y1] = f
+      const seqTs = srcToSeqTimes(clips, id, t)
+      if (!seqTs.length) continue
+      if (frac > 0.35) {
+        for (const T of seqTs) cuts.push({ t: T })
+        continue
+      }
+      if (frac < 0.0015 || frac > 0.22 || (x1 - x0) * (y1 - y0) > 0.3 || noisy(cx, cy)) continue
+      if (cx < crop.x || cx > crop.x + crop.w || cy < crop.y || cy > crop.y + crop.h) continue
+      const p = toCrop(crop, cx, cy)
+      const w = (x1 - x0) / crop.w
+      const h = (y1 - y0) / crop.h
+      for (const T of seqTs) hits.push({ t: T, x: p.x, y: p.y, w, h, f: frac })
+    }
+  }
+  if (!hits.length) return []
+  hits.sort((a, b) => a.t - b.t)
+  cuts.sort((a, b) => a.t - b.t)
+  const cutBetween = (a: number, b: number) => cuts.some((c) => c.t > a && c.t < b)
+
+  type Group = { s: number; e: number; n: number; wx: number; wy: number; ww: number; wh: number; wsum: number }
+  const groups: Group[] = []
+  let g: Group | null = null
+  const center = (q: Group) => ({ x: q.wx / q.wsum, y: q.wy / q.wsum })
+  for (const h of hits) {
+    const wgt = Math.sqrt(h.f)
+    if (g) {
+      const c = center(g)
+      if (h.t - g.e > 1.25 || Math.hypot(h.x - c.x, h.y - c.y) > 0.22 || cutBetween(g.e, h.t)) {
+        groups.push(g)
+        g = null
+      }
+    }
+    if (!g) g = { s: h.t, e: h.t, n: 0, wx: 0, wy: 0, ww: 0, wh: 0, wsum: 0 }
+    g.e = h.t
+    g.n++
+    g.wx += h.x * wgt
+    g.wy += h.y * wgt
+    g.ww += h.w * wgt
+    g.wh += h.h * wgt
+    g.wsum += wgt
+  }
+  if (g) groups.push(g)
+
+  let raw = groups
+    .filter((q) => q.n >= 3 || q.e - q.s >= 0.5)
+    .map((q) => {
+      const c = center(q)
+      const ext = Math.max(q.ww / q.wsum, q.wh / q.wsum, 0.18)
+      // frame the moving area with some room around it
+      const scale = clamp(1 / (1.5 * ext), 1.3, maxScale)
+      let s = Math.max(0, q.s - 0.7)
+      let e = Math.min(dur, q.e + 1.5)
+      // never zoom across a hard cut
+      const nextCut = cuts.find((k) => k.t > q.e)
+      if (nextCut) e = Math.min(e, nextCut.t - 0.1)
+      const prevCut = [...cuts].reverse().find((k) => k.t < q.s)
+      if (prevCut) s = Math.max(s, prevCut.t + 0.1)
+      if (e - s < 2.2) e = Math.min(dur, s + 2.2)
+      return { s, e, x: c.x, y: c.y, scale: Math.round(scale * 20) / 20, score: q.n * (q.wsum / q.n) }
+    })
+    .filter((r) => r.e - r.s >= 1)
+
+  // keep it tasteful: zoomed in for at most ~55% of the video, strongest moments first
+  const budget = dur * 0.55
+  let used = 0
+  raw = [...raw]
+    .sort((a, b) => b.score - a.score)
+    .filter((r) => {
+      if (used + (r.e - r.s) > budget) return false
+      used += r.e - r.s
+      return true
+    })
+    .sort((a, b) => a.s - b.s)
+
+  const out: typeof raw = []
+  for (const r of raw) {
+    const last = out[out.length - 1]
+    if (last && r.s < last.e + 0.6) {
+      if (Math.hypot(r.x - last.x, r.y - last.y) < 0.15 && !cutBetween(last.e, r.s)) {
+        last.e = Math.max(last.e, r.e)
+        continue
+      }
+      // a different spot right after: hand over cleanly instead of overlapping
+      last.e = Math.max(last.s + 1, r.s - 0.05)
+    }
+    out.push({ ...r })
+  }
+  return out
+    .filter((r) => r.e - r.s >= 1)
+    .map((r) => ({ id: uid(), start: +r.s.toFixed(3), end: +r.e.toFixed(3), scale: r.scale, follow: false, x: +r.x.toFixed(4), y: +r.y.toFixed(4), auto: true }))
+}
+
+/** Every sequence time where source time t of `source` is on screen. */
+function srcToSeqTimes(clips: SeqClip[], source: string, t: number) {
+  const out: number[] = []
+  let acc = 0
+  for (const c of clips) {
+    if (c.source === source && t >= c.in && t < c.out) out.push(acc + (t - c.in))
+    acc += Math.max(0, c.out - c.in)
+  }
+  return out
+}
+
+/**
+ * Auto zoom for any project: click / typing zooms for recorded sources, motion
+ * zooms for plain videos (when their analysis is loaded), never overlapping.
+ */
+export function smartZoomSegments(project: Project, clips: SeqClip[], scale = 1.5, crops?: EditState['crops'], activity?: Map<string, ActivityFrames>): ZoomSegment[] {
+  const auto = autoZoomSegments(project, clips, scale, crops)
+  if (!activity?.size) return auto
+  const motion = motionZoomSegments(project, clips, activity, crops).filter((m) => !auto.some((a) => m.start < a.end + 0.3 && m.end > a.start - 0.3))
+  return [...auto, ...motion].sort((a, b) => a.start - b.start)
+}
+
+/** True when a source has no cursor / click data, so only motion analysis can place zooms on it. */
+export const needsMotion = (project: Project, id: string) => !trackOf(project, id)

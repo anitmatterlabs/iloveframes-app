@@ -1,5 +1,5 @@
-import { spawn, ChildProcess } from 'child_process'
-import { existsSync } from 'fs'
+import { spawn, execFile, ChildProcess } from 'child_process'
+import { existsSync, promises as fsp } from 'fs'
 
 let cached: string | null = null
 
@@ -11,6 +11,35 @@ export function ffmpegPath(): string {
   if (!existsSync(p)) p = p.replace('app.asar.unpacked', 'app.asar')
   cached = p
   return p
+}
+
+/**
+ * macOS: a bundled ffmpeg that still carries the download quarantine flag (or
+ * lost its executable bit while being unpacked) is refused by Gatekeeper the
+ * first time it is spawned, which breaks capture, import and export at once.
+ * Clear both before anything runs. Safe to call repeatedly; never throws.
+ */
+export async function prepareFfmpeg(): Promise<{ ok: boolean; fixed: string[] }> {
+  const fixed: string[] = []
+  if (process.platform !== 'darwin' && process.platform !== 'linux') return { ok: true, fixed }
+  const p = ffmpegPath()
+  try {
+    const st = await fsp.stat(p)
+    if ((st.mode & 0o111) !== 0o111) {
+      await fsp.chmod(p, 0o755)
+      fixed.push('chmod')
+    }
+  } catch {
+    return { ok: false, fixed }
+  }
+  if (process.platform === 'darwin') {
+    const has = await new Promise<boolean>((r) => execFile('xattr', ['-p', 'com.apple.quarantine', p], (e) => r(!e)))
+    if (has) {
+      await new Promise<void>((r) => execFile('xattr', ['-d', 'com.apple.quarantine', p], () => r()))
+      fixed.push('quarantine')
+    }
+  }
+  return { ok: true, fixed }
 }
 
 /** Part of the captured screen to keep, as fractions of the full frame (0..1). */
@@ -31,9 +60,30 @@ export const cropFilter = (c: CropFrac) => {
   return `crop=trunc(iw*${f(c.w)}/2)*2:trunc(ih*${f(c.h)}/2)*2:trunc(iw*${f(c.x)}):trunc(ih*${f(c.y)})`
 }
 
-export function runFfmpeg(args: string[], onProgress?: (sec: number) => void): Promise<void> {
+/** Lets a caller stop a running ffmpeg (e.g. "Cancel import"). */
+export interface FfmpegHandle {
+  proc: ChildProcess | null
+  cancelled: boolean
+}
+export const newHandle = (): FfmpegHandle => ({ proc: null, cancelled: false })
+export function cancelHandle(h: FfmpegHandle | null | undefined) {
+  if (!h) return
+  h.cancelled = true
+  try {
+    h.proc?.kill('SIGKILL')
+  } catch {}
+}
+export class CancelledError extends Error {
+  constructor() {
+    super('cancelled')
+  }
+}
+
+export function runFfmpeg(args: string[], onProgress?: (sec: number) => void, handle?: FfmpegHandle): Promise<void> {
   return new Promise((resolve, reject) => {
+    if (handle?.cancelled) return reject(new CancelledError())
     const proc = spawn(ffmpegPath(), ['-hide_banner', '-y', ...args], { windowsHide: true })
+    if (handle) handle.proc = proc
     let tail = ''
     proc.stderr.on('data', (d: Buffer) => {
       const s = d.toString()
@@ -44,7 +94,11 @@ export function runFfmpeg(args: string[], onProgress?: (sec: number) => void): P
       }
     })
     proc.on('error', reject)
-    proc.on('close', (code) => (code === 0 ? resolve() : reject(new Error('ffmpeg failed (' + code + '): ' + tail.slice(-800)))))
+    proc.on('close', (code) => {
+      if (handle) handle.proc = null
+      if (handle?.cancelled) return reject(new CancelledError())
+      code === 0 ? resolve() : reject(new Error('ffmpeg failed (' + code + '): ' + tail.slice(-800)))
+    })
   })
 }
 
@@ -57,6 +111,83 @@ export function captureOutput(args: string[]): Promise<string> {
     proc.on('error', () => resolve(out))
     proc.on('close', () => resolve(out))
   })
+}
+
+/**
+ * Stream fixed-size raw frames out of ffmpeg's stdout (e.g. tiny grayscale
+ * thumbnails for motion analysis). `frameBytes` must match the -vf output.
+ */
+export function streamFrames(args: string[], frameBytes: number, onFrame: (frame: Buffer, index: number) => void, handle?: FfmpegHandle): Promise<number> {
+  return new Promise((resolve, reject) => {
+    if (handle?.cancelled) return reject(new CancelledError())
+    const proc = spawn(ffmpegPath(), ['-hide_banner', '-nostdin', ...args, 'pipe:1'], { windowsHide: true })
+    if (handle) handle.proc = proc
+    let pending = Buffer.alloc(0)
+    let n = 0
+    let tail = ''
+    proc.stdout.on('data', (d: Buffer) => {
+      pending = pending.length ? Buffer.concat([pending, d]) : d
+      while (pending.length >= frameBytes) {
+        onFrame(pending.subarray(0, frameBytes), n++)
+        pending = pending.subarray(frameBytes)
+      }
+    })
+    proc.stderr.on('data', (d: Buffer) => (tail = (tail + d.toString()).slice(-2000)))
+    proc.on('error', reject)
+    proc.on('close', (code) => {
+      if (handle) handle.proc = null
+      if (handle?.cancelled) return reject(new CancelledError())
+      code === 0 || n > 0 ? resolve(n) : reject(new Error('ffmpeg failed (' + code + '): ' + tail.slice(-600)))
+    })
+  })
+}
+
+export interface MediaInfo {
+  duration: number
+  width: number
+  height: number
+  hasAudio: boolean
+  /** video codec name as ffmpeg reports it (h264, hevc, prores, vp9 ...) */
+  vcodec: string
+  acodec: string
+  fps: number
+  rotation: number
+}
+
+/** Read what's inside a media file from ffmpeg's banner (no ffprobe in the bundle). */
+export async function probeMedia(file: string): Promise<MediaInfo> {
+  const out = await captureOutput(['-i', file])
+  const d = /Duration: (\d+):(\d+):(\d+(?:\.\d+)?)/.exec(out)
+  const vline = /Stream[^\n]*Video: ([^\n]*)/.exec(out)?.[1] ?? ''
+  // the frame size is the first "WxH" that follows the pixel format, not a hex codec tag
+  const size = /(?:^|[\s,])(\d{2,5})x(\d{2,5})(?=[\s,\]])/.exec(vline)
+  const fps = /([\d.]+) fps/.exec(vline)
+  const rot = /rotation of (-?[\d.]+) degrees|rotate\s*:\s*(-?\d+)/.exec(out)
+  const aline = /Stream[^\n]*Audio: ([^\n]*)/.exec(out)?.[1] ?? ''
+  return {
+    duration: d ? +d[1] * 3600 + +d[2] * 60 + +d[3] : 0,
+    width: size ? +size[1] : 0,
+    height: size ? +size[2] : 0,
+    hasAudio: !!aline,
+    vcodec: (/^(\w+)/.exec(vline)?.[1] ?? '').toLowerCase(),
+    acodec: (/^(\w+)/.exec(aline)?.[1] ?? '').toLowerCase(),
+    fps: fps ? +fps[1] : 0,
+    rotation: rot ? Math.round(Number(rot[1] ?? rot[2]) || 0) : 0
+  }
+}
+
+/** A short, path-free reason for an ffmpeg failure (for usage stats and friendlier messages). */
+export function ffmpegErrorKind(msg: string): string {
+  const m = String(msg)
+  if (/Operation not permitted|not permitted|EACCES|EPERM/i.test(m)) return 'permission'
+  if (/ENOENT|No such file/i.test(m)) return 'missing_file'
+  if (/No space left|ENOSPC/i.test(m)) return 'disk_full'
+  if (/Invalid data found|moov atom not found|could not find codec|Unsupported codec|Decoder .* not found/i.test(m)) return 'unsupported_media'
+  if (/Input\/output error|avfoundation|Selected framerate|pixel format .* not supported/i.test(m)) return 'capture_device'
+  if (/Cannot allocate memory|ENOMEM/i.test(m)) return 'memory'
+  if (/killed|SIGKILL|signal 9/i.test(m)) return 'killed'
+  if (/cancelled/i.test(m)) return 'cancelled'
+  return 'other'
 }
 
 /** macOS: map "Capture screen N" -> avfoundation device index */
@@ -121,8 +252,11 @@ export function startLiveCapture(args: string[]): LiveCapture {
         proc.stdin!.end()
       } catch {}
       const timer = setTimeout(() => proc.kill('SIGINT'), 8000)
+      // never hang a stop: a capture that ignores SIGINT is killed a little later
+      const hard = setTimeout(() => proc.kill('SIGKILL'), 14000)
       await exited
       clearTimeout(timer)
+      clearTimeout(hard)
     },
     kill: () => {
       try {
