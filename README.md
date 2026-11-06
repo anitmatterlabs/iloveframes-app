@@ -2,6 +2,8 @@
 
 Beautiful product walkthrough recordings for Windows and macOS: cursor-free capture, smooth auto-zoom, cinematic cursor, premium backgrounds, multi-clip editing and fast MP4/GIF export.
 
+**Edit your own videos too:** Home → *Edit your own video* (or drop files on the window / the Dock icon, or File → Edit Your Own Video…). Several files become one project, in order. Any format ffmpeg reads (MP4, MOV, WebM, MKV, M4V, AVI) is converted once so it scrubs smoothly; an iloveframes recording keeps its click and cursor data. Plain videos get **motion smart zoom**: a quick analysis finds where things happen on screen (menus, typing, buttons) and adds zooms there (`src/main/media.ts`, `motionZoomSegments` in `src/renderer/src/engine/motion.ts`).
+
 ## Develop
 ```bash
 npm install
@@ -45,5 +47,10 @@ Editor, engine, UI, licensing, recording data and export (`src/renderer`, `src/m
 
 Releases: every version is tagged `vX.Y.Z` and has a GitHub Release with the Windows and macOS files grouped separately.
 
+## Monitoring
+The app reports anonymous usage and health events to Pulse (`src/main/telemetry.ts`): capture engine and fallbacks with reasons, failed takes by stage, imports, updates, freezes, memory, React crashes. Pulse's **Health** tab shows crash-free installs, release health per version, Windows vs Mac quality, and alerts; a cron checks every 30 minutes and posts to Slack/Discord (see the pulse-analytics repo).
+
+CI (`.github/workflows/ci.yml`) type-checks and builds every push, and packages a signed macOS app to make sure the bundled ffmpeg runs.
+
 ## macOS first launch
-The app is ad-hoc signed (no Apple Developer certificate). First launch: right-click the app → **Open**, or System Settings → Privacy & Security → **Open Anyway**. Then allow **Screen Recording** and **Accessibility** (for click capture) when asked.
+The app is ad-hoc signed (no Apple Developer certificate); every bundled binary (ffmpeg, native modules) is signed too (`scripts/adhoc-sign.cjs`). First launch: right-click the app → **Open**, or System Settings → Privacy & Security → **Open Anyway**. Then allow **Screen Recording** and **Accessibility** (for click capture) when asked. macOS applies Screen Recording only after a restart: Home shows a *Restart iloveframes* button for that. Move the app to Applications: copies running from Downloads or the disk image can't update themselves, and the app says so.
